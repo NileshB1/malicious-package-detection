@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pkgtriage"
+version = "0.1.0"
+description = "Behaviour-based detection and triage of malicious Python packages from install-time traces"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "Nilesh Barge" }]
+
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "scikit-learn>=1.6",
+    "matplotlib>=3.9",
+    "shap>=0.46",
+    "streamlit>=1.40",
+    "pyyaml>=6.0",
+    "huggingface_hub>=0.26",
+    "pyarrow>=17",
+    "joblib>=1.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.8", "jupyter>=1.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
