@@ -18,6 +18,7 @@ class DatasetConfig:
     label_column: str
     id_column: str
     expected_rows: int
+    sha256: str | None = None
 
 
 @dataclass(frozen=True)

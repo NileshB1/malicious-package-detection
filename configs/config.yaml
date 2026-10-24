@@ -7,6 +7,7 @@ dataset:
   label_column: Level
   id_column: Package_Name
   expected_rows: 14270
+  sha256: 910cb1595f4a779c77fee8ac39b68c24da438834868dda727d5a5c43095881bb
 
 paths:
   raw_dir: data/raw
