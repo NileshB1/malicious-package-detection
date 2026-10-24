@@ -1,0 +1,23 @@
+seed: 42
+
+dataset:
+  repo_id: Hugnd-UIT/ML-Based-Malicious-Package-Detection
+  revision: 620d102fa9ba04beca380c2422d1b5343680db94
+  filename: dataset/QUT-DV25.csv
+  label_column: Level
+  id_column: Package_Name
+  expected_rows: 14270
+
+paths:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  splits_dir: data/splits
+  artifacts_dir: artifacts
+  images_dir: images
+  tables_dir: reports/tables
+
+split:
+  # train, validation, and test. validation is used for calibration and policy thresholds
+  train: 0.70
+  validation: 0.15
+  test: 0.15

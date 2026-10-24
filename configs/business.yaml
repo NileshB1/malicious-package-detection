@@ -1,0 +1,23 @@
+# business assumptions used by the decision policy and the cost simulation.
+
+
+prevalence_scenarios:
+  # share of incoming package requests that are malicious
+  low: 0.001
+  base: 0.01
+  high: 0.05
+
+capacity:
+  analysts: 2
+  reviews_per_analyst_per_day: null
+  source: null
+
+costs:
+  currency: EUR
+  analyst_hourly_rate: null
+  review_minutes_per_package: null
+  missed_malicious_package: null
+  false_block_per_package: null
+  source: null
+
+requests_per_day: null
