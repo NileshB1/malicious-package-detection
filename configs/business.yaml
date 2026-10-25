@@ -15,6 +15,10 @@ capacity:
   reviews_per_analyst_per_day:
     value: 12
     source: assumption - about 6 focused hours at 30 min per package
+  analyst_detection_rate:
+    # a human reviewer misses some malicious packages too; 1.0 would flatter the review tier
+    value: 0.9
+    source: assumption - tested from 0.7 to 1.0 in sensitivity analysis
 
 requests_per_day:
   value: 200
