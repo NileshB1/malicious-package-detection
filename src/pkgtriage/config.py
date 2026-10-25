@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-# src/pkgtriage/config.py -> project root is two levels above the package
+# src/pkgtriage/config.py => project root is two levels above the package
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = PROJECT_ROOT / "configs"
 
@@ -77,10 +77,8 @@ def load_config(path: Path | str | None = None) -> Config:
         raise ValueError(f"split fractions must add up to 1, got {total:.3f}")
 
     return Config(
-        seed=int(raw.get("seed", 42)),
-        dataset=DatasetConfig(**_section(raw, "dataset", path)),
-        paths=Paths(**paths),
-        split=split,
+        seed=int(raw.get("seed", 42)), dataset=DatasetConfig(**_section(raw, "dataset", path)),
+        paths=Paths(**paths),    split=split
     )
 
 

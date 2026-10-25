@@ -29,29 +29,20 @@ GRID = "#e4e3df"
 def use_report_style() -> None:
     plt.rcParams.update(
         {
-            "figure.dpi": 110,
-            "savefig.dpi": 300,
+            "figure.dpi": 110,     "savefig.dpi": 300,
             "savefig.bbox": "tight",
             "font.family": "serif",
             "font.serif": ["Times New Roman", "Times", "DejaVu Serif"],
-            "font.size": 8,
-            "axes.titlesize": 8.5,
+            "font.size": 8,     "axes.titlesize": 8.5,
             "axes.labelsize": 8,
-            "xtick.labelsize": 7,
-            "ytick.labelsize": 7,
-            "legend.fontsize": 7,
-            "legend.frameon": False,
-            "axes.edgecolor": INK_SOFT,
-            "axes.labelcolor": INK,
-            "xtick.color": INK_SOFT,
-            "ytick.color": INK_SOFT,
-            "axes.spines.top": False,
-            "axes.spines.right": False,
-            "axes.grid": True,
-            "grid.color": GRID,
-            "grid.linewidth": 0.6,
-            "axes.axisbelow": True,
-            "lines.linewidth": 1.5,
+            "xtick.labelsize": 7,  "ytick.labelsize": 7,
+            "legend.fontsize": 7, "legend.frameon": False,
+            "axes.edgecolor": INK_SOFT, "axes.labelcolor": INK,
+            "xtick.color": INK_SOFT,  "ytick.color": INK_SOFT,
+            "axes.spines.top": False,    "axes.spines.right": False,
+            "axes.grid": True,    "grid.color": GRID,
+            "grid.linewidth": 0.6,  "axes.axisbelow": True,
+            "lines.linewidth": 1.5
         }
     )
 
@@ -71,10 +62,8 @@ def _class_legend(ax):
     # above the axes so it never sits on top of a bar
     ax.legend(
         handles=[Patch(color=BENIGN, label="Benign"), Patch(color=MALICIOUS, label="Malicious")],
-        loc="lower center",
-        bbox_to_anchor=(0.5, 1.0),
-        ncol=2,
-        handlelength=1.2,
+        loc="lower center",  bbox_to_anchor=(0.5, 1.0),
+        ncol=2,  handlelength=1.2
     )
 
 
@@ -106,11 +95,9 @@ def count_distributions_figure(df: pd.DataFrame, features: list[str]):
         data = [np.log10(df.loc[df.Level == k, feat] + 1) for k in (0, 1)]
         parts = ax.boxplot(
             data,
-            vert=False,
-            widths=0.6,
-            patch_artist=True,
-            showfliers=False,
-            medianprops={"color": INK, "linewidth": 1},
+            vert=False,  widths=0.6,
+            patch_artist=True,  showfliers=False,
+            medianprops={"color": INK, "linewidth": 1}
         )
         for patch, colour in zip(parts["boxes"], (BENIGN, MALICIOUS), strict=True):
             patch.set_facecolor(colour)
@@ -204,10 +191,8 @@ def split_overlap_figure(summary: pd.DataFrame):
                 b.get_x() + b.get_width() / 2,
                 b.get_height(),
                 f"{int(b.get_height()):,}",
-                ha="center",
-                va="bottom",
-                fontsize=6.5,
-                color=INK_SOFT,
+                ha="center", va="bottom",
+                fontsize=6.5,  color=INK_SOFT
             )
     ax.set_xticks(x, ["Train", "Validation", "Test"])
     ax.set_ylabel("Rows with a sibling\nin another split")
@@ -216,9 +201,7 @@ def split_overlap_figure(summary: pd.DataFrame):
         bars,
         ["Random split", "Family-grouped split"],
         loc="lower center",
-        bbox_to_anchor=(0.5, 1.0),
-        ncol=2,
-        handlelength=1.2,
+        bbox_to_anchor=(0.5, 1.0), ncol=2,  handlelength=1.2
     )
     ax.set_title("Package variants leaking across splits", pad=16)
     return fig
