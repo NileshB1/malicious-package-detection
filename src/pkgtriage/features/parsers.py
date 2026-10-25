@@ -31,11 +31,9 @@ TCP_STATES = ["ESTABLISHED", "SYN_SENT", "CLOSE", "CLOSE_WAIT", "FIN_WAIT1", "LI
 TCP_FEATURES = [
     "tcp_events",
     *[f"tcp_{s.lower()}" for s in TCP_STATES],
-    "tcp_port_443",
-    "tcp_port_80",
+    "tcp_port_443",  "tcp_port_80",
     "tcp_port_other",
-    "tcp_distinct_ports",
-    "tcp_raw_ip_events",
+    "tcp_distinct_ports",   "tcp_raw_ip_events"
 ]
 
 
@@ -91,23 +89,9 @@ def parse_tcp_transitions(cell) -> dict[str, float]:
 
 BUILD_TOOLS = {"cc1", "cc1plus", "ld", "ld.bfd", "as", "gcc", "g++", "rustc", "cargo", "make"}
 SHELL_TOOLS = {
-    "sh",
-    "bash",
-    "dash",
-    "cat",
-    "grep",
-    "sed",
-    "awk",
-    "ps",
-    "fuser",
-    "tar",
-    "gzip",
-    "xz",
-    "zstd",
-    "cpio",
-    "file",
-    "curl",
-    "wget",
+    "sh",   "bash",  "dash",  "cat",  "grep",
+    "sed", "awk", "ps", "fuser", "tar", "gzip",
+    "xz", "zstd", "cpio", "file", "curl",  "wget"
 }
 
 PROCESS_FEATURES = ["proc_build_tools", "proc_shell_tools", "proc_other_distinct"]
@@ -139,12 +123,9 @@ def parse_processes(*cells) -> dict[str, float]:
 # the names themselves would let the model memorise particular packages.
 
 DEPENDENCY_FEATURES = [
-    "dep_total_count",
-    "dep_direct_count",
-    "dep_indirect_count",
-    "dep_total_missing",
-    "dep_direct_missing",
-    "dep_indirect_missing",
+    "dep_total_count", "dep_direct_count",
+    "dep_indirect_count",  "dep_total_missing",  "dep_direct_missing",
+    "dep_indirect_missing"
 ]
 
 
@@ -156,12 +137,10 @@ def count_items(cell) -> float:
 
 def parse_dependencies(total, direct, indirect) -> dict[str, float]:
     return {
-        "dep_total_count": count_items(total),
-        "dep_direct_count": count_items(direct),
-        "dep_indirect_count": count_items(indirect),
-        "dep_total_missing": float(_is_blank(total)),
+        "dep_total_count": count_items(total),   "dep_direct_count": count_items(direct),
+        "dep_indirect_count": count_items(indirect), "dep_total_missing": float(_is_blank(total)),
         "dep_direct_missing": float(_is_blank(direct)),
-        "dep_indirect_missing": float(_is_blank(indirect)),
+        "dep_indirect_missing": float(_is_blank(indirect))
     }
 
 
@@ -173,45 +152,20 @@ def parse_dependencies(total, direct, indirect) -> dict[str, float]:
 
 SYSCALL_FAMILIES = {
     "file": {
-        "newfstatat",
-        "fstat",
-        "openat",
-        "lseek",
-        "read",
-        "write",
-        "close",
-        "fcntl",
-        "getdents64",
-        "unlinkat",
-        "unlink",
-        "mkdir",
-        "rmdir",
-        "chown",
-        "utimensat",
-        "getcwd",
-        "umask",
+        "newfstatat", "fstat", "openat", "lseek",
+        "read", "write", "close", "fcntl", "getdents64",
+        "unlinkat",  "unlink",   "mkdir", "rmdir",
+        "chown", "utimensat",  "getcwd",  "umask"
     },
     "network": {
-        "socket",
-        "connect",
-        "getsockname",
-        "getpeername",
-        "setsockopt",
-        "recvfrom",
-        "sendto",
+        "socket", "connect", "getsockname",  "getpeername",  "setsockopt",
+        "recvfrom", "sendto"
     },
     "process": {
-        "exit_group",
-        "wait4",
-        "getpid",
-        "geteuid",
-        "futex",
-        "rt_sigaction",
-        "rt_sigprocmask",
-        "rt_sigreturn",
-        "set_robust_list",
-        "rseq",
-        "clock_nanosleep",
+        "exit_group",   "wait4", "getpid", "geteuid",
+        "futex",  "rt_sigaction",   "rt_sigprocmask",  "rt_sigreturn",
+        "set_robust_list", "rseq",
+        "clock_nanosleep"
     },
     "memory": {"mmap", "munmap", "brk"},
     "io_wait": {"ioctl", "poll", "ppoll", "pselect6"},
@@ -220,10 +174,8 @@ SYSCALL_FAMILIES = {
 
 PATTERN_FEATURES = [
     *[f"pat_{family}" for family in SYSCALL_FAMILIES],
-    "pat_errors",
-    "pat_unknown_syscalls",
-    "pat_distinct_tokens",
-    "pat_missing_slots",
+    "pat_errors",  "pat_unknown_syscalls", "pat_distinct_tokens",
+    "pat_missing_slots"
 ]
 
 

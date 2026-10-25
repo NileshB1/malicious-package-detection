@@ -3,22 +3,14 @@ from __future__ import annotations
 import pandas as pd
 
 from pkgtriage.data.schema import (
-    DEPENDENCY_TEXT,
-    FILESYSTEM_COUNTS,
-    NETWORK_COUNTS,
-    PATTERN_TEXT,
-    PROCESS_TEXT,
-    SYSCALL_COUNTS,
+    DEPENDENCY_TEXT,  FILESYSTEM_COUNTS,
+    NETWORK_COUNTS, PATTERN_TEXT,  PROCESS_TEXT,
+    SYSCALL_COUNTS
 )
 from pkgtriage.features.parsers import (
-    DEPENDENCY_FEATURES,
-    PATTERN_FEATURES,
-    PROCESS_FEATURES,
+    DEPENDENCY_FEATURES, PATTERN_FEATURES, PROCESS_FEATURES,
     TCP_FEATURES,
-    parse_dependencies,
-    parse_patterns,
-    parse_processes,
-    parse_tcp_transitions,
+    parse_dependencies, parse_patterns, parse_processes, parse_tcp_transitions
 )
 
 LABEL = "Level"
@@ -32,8 +24,7 @@ PATTERN_GROUP = [f for f in PATTERN_FEATURES if f != "pat_missing_slots"]
 
 FEATURE_GROUPS: dict[str, list[str]] = {
     "filesystem": FILESYSTEM_COUNTS,
-    "network": NETWORK_GROUP,
-    "syscall": SYSCALL_GROUP + PATTERN_GROUP,
+    "network": NETWORK_GROUP, "syscall": SYSCALL_GROUP + PATTERN_GROUP,
     "process": PROCESS_FEATURES,
     "dependency": [f for f in DEPENDENCY_FEATURES if not f.endswith("_missing")],
     "missingness": [f for f in DEPENDENCY_FEATURES if f.endswith("_missing")]
