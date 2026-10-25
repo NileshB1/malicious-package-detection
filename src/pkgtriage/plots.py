@@ -1,5 +1,4 @@
-"""Matplotlib figures for the report and the app
-"""
+"""Matplotlib figures for the report and the app"""
 
 from __future__ import annotations
 
@@ -184,4 +183,42 @@ def correlation_figure(df: pd.DataFrame, features: list[str]):
     ax.grid(False)
     fig.colorbar(im, ax=ax, shrink=0.7, label="Spearman correlation")
     ax.set_title("Correlation between count features")
+    return fig
+
+
+def split_overlap_figure(summary: pd.DataFrame):
+    """Rows in each split whose package family also appears in another split."""
+    order = ["train", "validation", "test"]
+    random = summary[summary.split_type == "random"].set_index("split").reindex(order)
+    grouped = summary[summary.split_type == "grouped"].set_index("split").reindex(order)
+    x = np.arange(len(order))
+    w = 0.38
+    fig, ax = plt.subplots(figsize=(SINGLE_COL, 2.1))
+    bars = [
+        ax.bar(x - w / 2, random.families_shared_with_other_splits, w, color=NEUTRAL),
+        ax.bar(x + w / 2, grouped.families_shared_with_other_splits, w, color=BENIGN),
+    ]
+    for group in bars:
+        for b in group:
+            ax.text(
+                b.get_x() + b.get_width() / 2,
+                b.get_height(),
+                f"{int(b.get_height()):,}",
+                ha="center",
+                va="bottom",
+                fontsize=6.5,
+                color=INK_SOFT,
+            )
+    ax.set_xticks(x, ["Train", "Validation", "Test"])
+    ax.set_ylabel("Rows with a sibling\nin another split")
+    ax.grid(axis="x", visible=False)
+    ax.legend(
+        bars,
+        ["Random split", "Family-grouped split"],
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.0),
+        ncol=2,
+        handlelength=1.2,
+    )
+    ax.set_title("Package variants leaking across splits", pad=16)
     return fig

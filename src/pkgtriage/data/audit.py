@@ -1,5 +1,4 @@
-"""Checks for leakage and collection artefacts in QUT-DV25.
-"""
+"""Checks for leakage and collection artefacts in QUT-DV25."""
 
 from __future__ import annotations
 
@@ -10,9 +9,12 @@ from sklearn.metrics import roc_auc_score
 
 from pkgtriage.data.families import assign_families
 from pkgtriage.data.schema import (
-    COUNT_COLUMNS,  DESKTOP_PROCESSES,
-    INSTALLER_PROCESSES, MONITORING_PROCESSES, 
-    PROCESS_TEXT, TEXT_COLUMNS
+    COUNT_COLUMNS,
+    DESKTOP_PROCESSES,
+    INSTALLER_PROCESSES,
+    MONITORING_PROCESSES,
+    PROCESS_TEXT,
+    TEXT_COLUMNS,
 )
 
 LABEL = "Level"
@@ -43,7 +45,8 @@ def missingness_by_class(df: pd.DataFrame) -> pd.DataFrame:
             continue
         rows.append(
             {
-              "column": col,  "missing_benign_pct": 100 * miss[df[LABEL] == 0].mean(),
+                "column": col,
+                "missing_benign_pct": 100 * miss[df[LABEL] == 0].mean(),
                 "missing_malicious_pct": 100 * miss[df[LABEL] == 1].mean(),
                 "auc_of_missingness": _auc(df[LABEL], miss.astype(int)),
             }
@@ -56,9 +59,10 @@ def single_feature_auc(df: pd.DataFrame) -> pd.DataFrame:
     for col in COUNT_COLUMNS:
         rows.append(
             {
-                "feature": col,  "auc": _auc(df[LABEL], df[col]),
-              "median_benign": df.loc[df[LABEL] == 0, col].median(),
-             "median_malicious": df.loc[df[LABEL] == 1, col].median(),
+                "feature": col,
+                "auc": _auc(df[LABEL], df[col]),
+                "median_benign": df.loc[df[LABEL] == 0, col].median(),
+                "median_malicious": df.loc[df[LABEL] == 1, col].median(),
             }
         )
     return pd.DataFrame(rows).sort_values("auc", ascending=False)
@@ -111,10 +115,11 @@ def family_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         "families": int(sizes.size),
         "families_with_variants": int((sizes > 1).sum()),
         "rows_in_multi_member_families": int(fam.map(sizes).gt(1).sum()),
-        "largest_family": sizes.index[0], "largest_family_size": int(sizes.iloc[0]),
+        "largest_family": sizes.index[0],
+        "largest_family_size": int(sizes.iloc[0]),
         "mixed_label_families": int(
             ((per_family.malicious_share > 0) & (per_family.malicious_share < 1)).sum()
-        )
+        ),
     }
     return per_family, stats
 
@@ -122,8 +127,10 @@ def family_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 def run_audit(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     families, fam_stats = family_summary(df)
     return {
-        "name_format_by_class": name_format_by_class(df),  "missingness_by_class": missingness_by_class(df),
+        "name_format_by_class": name_format_by_class(df),
+        "missingness_by_class": missingness_by_class(df),
         "single_feature_auc": single_feature_auc(df),
         "process_tokens_by_class": process_tokens_by_class(df),
-        "family_sizes": families,  "family_stats": pd.DataFrame([fam_stats]),
+        "family_sizes": families,
+        "family_stats": pd.DataFrame([fam_stats]),
     }

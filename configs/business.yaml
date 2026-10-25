@@ -1,23 +1,45 @@
 # business assumptions used by the decision policy and the cost simulation.
-
+# Every number has a source. "assumption" means I could not find a published figure; those
+# are the ones the sensitivity analysis in Phase 6 has to stress-test.
 
 prevalence_scenarios:
-  # share of incoming package requests that are malicious
+  # share of incoming package requests that are malicious (scenario choices, not measured)
   low: 0.001
   base: 0.01
   high: 0.05
 
 capacity:
-  analysts: 2
-  reviews_per_analyst_per_day: null
-  source: null
+  analysts:
+    value: 2
+    source: assumption - small AppSec team
+  reviews_per_analyst_per_day:
+    value: 12
+    source: assumption - about 6 focused hours at 30 min per package
+
+requests_per_day:
+  value: 200
+  source: assumption - new package requests through an internal proxy for a mid-size engineering org
 
 costs:
-  currency: EUR
-  analyst_hourly_rate: null
-  review_minutes_per_package: null
-  missed_malicious_package: null
-  false_block_per_package: null
-  source: null
-
-requests_per_day: null
+  currency: USD
+  supply_chain_breach_cost:
+    value: 4910000
+    source: >-
+      IBM / Ponemon, Cost of a Data Breach Report 2025, Fig. 9 - average cost of breaches
+      whose initial vector was third-party vendor and supply chain compromise (USD 4.91M)
+  breach_probability_if_malicious_installed:
+    # most malicious installs will not turn into a reportable breach; nobody publishes this rate
+    value: 0.05
+    source: assumption - tested from 0.01 to 0.5 in sensitivity analysis
+  analyst_hourly_rate:
+    value: 60
+    source: assumption - loaded hourly cost of a security analyst
+  review_minutes_per_package:
+    value: 30
+    source: assumption
+  developer_hourly_rate:
+    value: 60
+    source: assumption
+  developer_hours_lost_per_false_block:
+    value: 2
+    source: assumption - raise a ticket, wait, find an alternative package

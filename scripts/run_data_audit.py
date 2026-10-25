@@ -15,10 +15,12 @@ from pkgtriage.data.schema import COUNT_COLUMNS
 from pkgtriage.data.validate import validate_raw
 
 KEY_FEATURES = [
-    "Network_Operations", "Home_DIR_Installation",
+    "Network_Operations",
+    "Home_DIR_Installation",
     "Process_Management_Operations",
     "Root_DIR_Installation",
-    "Etc_DIR_Installation",  "Remote_IP_Address_Access"
+    "Etc_DIR_Installation",
+    "Remote_IP_Address_Access",
 ]
 
 
