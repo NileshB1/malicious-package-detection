@@ -1,0 +1,50 @@
+,mean_abs_shap,group,description
+dep_direct_count,6.595358775402146,dependency,declared dependencies
+dep_total_count,2.758043943984598,dependency,dependencies resolved
+Network_Operations,2.5695207047517323,network,network system calls
+Home_DIR_Installation,1.4793300432218084,filesystem,file accesses in home directories
+tcp_close_wait,1.0602198304653576,network,connections left waiting to close
+dep_indirect_count,0.8928521929470461,dependency,indirect dependencies
+Root_DIR_Installation,0.8414696610161573,filesystem,file accesses under /root
+Sys_Access,0.779897463707593,filesystem,file accesses under /sys
+Remote_Port_Access,0.7391829614058333,network,remote ports contacted
+File_Operations,0.700879635368608,syscall,file system calls
+Temporary_DIR_Installation,0.6983449395096518,filesystem,file accesses under /tmp
+proc_build_tools,0.6490287188198803,process,compilers or build tools started
+Process_Management_Operations,0.637534007655603,syscall,process creation and control calls
+User_Access,0.6103085039701285,filesystem,file accesses under /usr
+IO_Operations,0.5406148883597632,syscall,general I/O calls
+Other_DIR_Installation,0.4003691853668607,filesystem,file accesses elsewhere (e.g. /proc)
+Local_IP_Address_Access,0.3941876118601814,network,local IP addresses used
+Security_Operations,0.3826561179056974,syscall,"permission and identity calls (chmod, setuid...)"
+Etc_DIR_Installation,0.37777816838158873,filesystem,file accesses under /etc
+tcp_port_443,0.30578343761563015,network,HTTPS (443) traffic events
+dep_total_missing,0.2894527391416752,missingness,no dependency record
+tcp_fin_wait1,0.26821008530607443,network,connections being shut down
+Remote_IP_Address_Access,0.2442238948771278,network,remote IP addresses contacted
+pat_errors,0.23606633987831488,syscall,errors in the common syscall sequences
+dep_indirect_missing,0.20947664866504395,missingness,no indirect dependencies recorded
+pat_io_wait,0.19668853009042625,syscall,wait/poll calls in the common syscall sequences
+pat_distinct_tokens,0.17661220561276242,syscall,variety of system calls in the common sequences
+tcp_close,0.1738446073832414,network,TCP connections closed
+pat_file,0.14276954887782622,syscall,file calls in the common syscall sequences
+tcp_established,0.13913144551560533,network,TCP connections established
+tcp_events,0.13706643880356553,network,TCP state changes
+dep_direct_missing,0.12027174402407073,missingness,no declared dependencies recorded
+Local_Port_Access,0.09619437783998804,network,local ports opened
+Time_Operations,0.07906504238116267,syscall,timer calls
+tcp_port_80,0.0723510314781621,network,plain HTTP (80) traffic events
+pat_time,0.06268294900267368,syscall,timer calls in the common syscall sequences
+pat_missing_slots,0.051588772806264796,missingness,missing syscall sequences
+tcp_syn_sent,0.046706734105487785,network,outgoing connection attempts
+tcp_listen,0.043822509651487686,network,listening sockets opened
+tcp_port_other,0.035918907396315695,network,traffic on unusual ports
+proc_other_distinct,0.03216851673135559,process,other unexpected processes started
+tcp_distinct_ports,0.02764304371132525,network,distinct remote ports
+proc_lists_missing,0.012553629636351206,missingness,no process list recorded
+pat_process,0.011369713996060868,syscall,process calls in the common syscall sequences
+proc_shell_tools,0.008704651024643581,process,shell or file utilities started
+pat_network,0.005591977557053,syscall,network calls in the common syscall sequences
+pat_memory,0.0038952034331328766,syscall,memory calls in the common syscall sequences
+tcp_raw_ip_events,0.0016017517064534374,network,connections straight to an IP address
+pat_unknown_syscalls,0.0,syscall,unnamed system calls
