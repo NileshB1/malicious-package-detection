@@ -1,0 +1,7 @@
+split,split_type,rows,malicious_share,families,families_shared_with_other_splits
+train,grouped,9988,0.49949939927913495,9073,0
+validation,grouped,2141,0.4992993928070995,1942,0
+test,grouped,2141,0.4992993928070995,1945,0
+train,random,9988,0.49949939927913495,9198,803
+validation,random,2141,0.4992993928070995,2078,265
+test,random,2141,0.4992993928070995,2071,256
