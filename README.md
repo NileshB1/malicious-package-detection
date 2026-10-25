@@ -69,7 +69,8 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 2. Literature review and research design | Done: 34 verified sources, research questions fixed before modelling |
 | 3. Data acquisition and understanding | Done: pinned download, validation, artefact audit, EDA |
 | 4. Feature engineering and grouped split | Done: 49 numeric features in 6 groups, family-grouped 70/15/15 split |
-| 5. Primary model | Next |
+| 5. Primary model | Done: calibrated gradient boosting, rule baseline, robustness checks, SHAP |
+| 6. Decision policy and business value | Next |
 
 ## Features and splits
 
@@ -100,6 +101,50 @@ The network, dependency and missingness groups are flagged as *collection-sensit
 
 **Splits.** Packages are grouped into name families (`bytedtrace`, `bytedtrace2`, ... count as one), and whole families go to train, validation or test. The split is stratified, so each part is 49.9% malicious. A plain random split is also saved, purely for comparison: with it, 256 of the 2,141 test packages have a near-identical sibling in the training data. With the grouped split that number is zero.
 
+## The model
+
+```powershell
+python scripts/train_model.py       # about 3 minutes: tuning, training, calibration
+python scripts/evaluate_model.py    # test-set results, robustness checks, SHAP, figures
+```
+
+**What it is.** A single `HistGradientBoostingClassifier` from scikit-learn. Gradient-boosted trees are a good fit for this kind of skewed count data with gaps, they're fast enough to score each package request as it comes in, and they were the strongest family in the original DySec work, so there was no reason to run another bake-off. The settings were picked with a small grid search (16 combinations) using 5-fold cross-validation that keeps package families together. The model then gets sigmoid calibration on the validation set, so that "0.8" really means about 80% likely to be malicious. Phase 6 needs that, because it turns probabilities into costs.
+
+Next to it sits a **rule baseline**: six readable checks (/root, /etc and home-directory access, permission calls, shell tools, unexpected processes), each with a threshold at the 95th percentile of benign training packages. It's roughly what a security team would write by hand.
+
+**Results on the grouped test set** (2,141 packages the model never saw, with no family overlap; 95% bootstrap intervals in `reports/tables/test_metrics.csv`):
+
+| | PR-AUC | Malicious caught at 1% false alarms | at 5% false alarms |
+| --- | --- | --- | --- |
+| Gradient boosting (calibrated) | 0.999 (0.999-1.000) | 99.3% (98.2-99.7) | 99.9% |
+| Rule baseline | 0.740 (0.719-0.762) | 18.2% (15.7-20.5) | 45.4% |
+
+**How much of that is real?** The same model was retrained with different inputs (`reports/tables/ablation.csv`, `images/model_ablation.png`):
+
+| Inputs | Caught at 1% false alarms |
+| --- | --- |
+| All 49 features | 99.3% |
+| Random split instead of grouped | 99.8% |
+| Without network features | 98.5% |
+| Without dependency and missingness features | 97.8% |
+| Without any collection-sensitive group (24 behaviour features) | 95.6% |
+| Filesystem access only | 86.0% |
+| Syscall counts only | 75.0% |
+| Process lists only | 0.0% |
+
+Two things stand out. First, the grouped split costs less than expected (99.8% compared with 99.3%), so the package families weren't the main source of optimism. Second, behaviour alone still separates the classes well, but the full model *leans* on the artefact-prone features: 65% of its SHAP attribution comes from the dependency, network and missingness groups (`reports/tables/shap_group_share.csv`). The single biggest driver is "declared dependencies", which is empty for nearly every malicious row because they were installed from local files. Without those features, about six times as many malicious packages slip through at a 1% false-alarm rate (4.4% compared with 0.7%).
+
+**Decision taken:** the app and the decision policy use the all-features model, because it scores best on this data. The trade-off is that some of its explanations point at install-method artefacts rather than behaviour. Those drivers are flagged as collection-sensitive (`Driver.collection_sensitive`) so the app can say so. The behaviour-only result (95.6%) is the more conservative estimate of what you'd see in a sandbox where every package is installed the same way, and the report presents both.
+
+**Figures:** `images/model_pr_curve.png`, `model_reliability.png`, `model_score_distribution.png`, `model_ablation.png`, `model_shap_importance.png`.
+
+**Model card in brief**
+
+- *Intended use:* ranking sandboxed install traces for review by a security analyst. Not for labelling packages as malicious in public.
+- *Training data:* QUT-DV25, 9,988 packages (train), 2,141 (validation, calibration only), 2,141 (test, used once).
+- *Known limits:* collection artefacts (above); benign labels not independently verified; 50/50 class balance (Phase 6 re-weights to realistic rates); runtime-only malware is invisible to install traces; one sandbox, one ecosystem.
+- *Artefacts:* `artifacts/model.joblib` (not committed; rebuilt by the training script) with a readable `artifacts/model.json` alongside.
+
 | Document | What's in it |
 | --- | --- |
 | [docs/project_plan.md](docs/project_plan.md) | Ten-phase plan and commit breakdown |
@@ -121,7 +166,8 @@ images/             matplotlib figures for the report and the app
 notebooks/          exploratory analysis
 reports/tables/     CSV outputs that the report numbers come from
 scripts/            command-line entry points
-src/pkgtriage/      the Python package (config, data, features, plots)
+src/pkgtriage/      the Python package (config, data, features, models, plots)
+artifacts/          trained model files (not committed)
 ```
 
 ## Credits
