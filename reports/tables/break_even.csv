@@ -1,0 +1,4 @@
+compared_with,break_even_breach_probability,verdict
+allow everything,3.794905999431203e-05,model cheaper when breach probability is above 0.000038
+review everything,,model cheaper at every breach probability
+rule screen (flag to review),,model cheaper at every breach probability
