@@ -79,8 +79,7 @@ def main():
         json.dumps(
             {
                 "t_low": policy.t_low,  "t_high": policy.t_high,
-                "scenario": BASE,  "prevalence": prevalence,
-                "chosen_on": "validation split"
+                "scenario": BASE,  "prevalence": prevalence, "chosen_on": "validation split"
             },
             indent=2
         )
