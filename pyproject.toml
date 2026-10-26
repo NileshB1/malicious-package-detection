@@ -35,3 +35,7 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.isort]
+# app/components.py is imported as a top-level module by the Streamlit pages
+known-first-party = ["pkgtriage", "components"]
