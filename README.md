@@ -71,7 +71,8 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 4. Feature engineering and grouped split | Done: 49 numeric features in 6 groups, family-grouped 70/15/15 split |
 | 5. Primary model | Done: calibrated gradient boosting, rule baseline, robustness checks, SHAP |
 | 6. Decision policy and business value | Done: allow/review/block thresholds, scenario costs, sensitivity, break-even |
-| 7. Streamlit application | Next |
+| 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
+| 8. Testing and validation | Next |
 
 ## Features and splits
 
@@ -190,17 +191,40 @@ Review time, hourly rates and developer friction barely matter, because one miss
 
 **What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). With behaviour-only features, about six times as many malicious packages slip through at a 1% false-alarm rate, so the "let through" column would rise roughly in proportion. The 129 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
 
+## The app
+
+```powershell
+streamlit run app/streamlit_app.py
+```
+
+Run the training and simulation scripts first (`train_model.py`, then `run_business_simulation.py`): the app reads `artifacts/model.joblib` and `artifacts/policy.json`.
+
+| Page | Who it's for | What you can do |
+| --- | --- | --- |
+| Overview | Anyone | Base-case numbers at a glance and the caveats to keep in mind |
+| Review queue | Analyst | Simulate a day of requests from the held-out test packages (choose volume and share malicious) or upload a sandbox export; see what was allowed, sent for review or blocked against the team's capacity; download the decisions |
+| Package detail | Analyst | Open one package, see its top reasons as a chart and in words, with collection-sensitive reasons marked; work through a short checklist; record allow / block / escalate with a note; download the session's decision log |
+| Policy simulator | Manager | Change request volume, team size, review time, analyst detection rate, breach chance and cost; move the thresholds or let the app find the cheapest ones; compare all four ways of handling requests |
+| Model evidence | Manager, assessor | Test results, calibration, robustness checks, what drives the scores, known limitations |
+
+The UI does no modelling itself. Everything goes through `ScoringService` in `src/pkgtriage/services/scoring.py`, which validates an upload, builds features, scores, applies the thresholds and explains each package. Uploads with missing columns, text in count columns or duplicate names get a plain error message instead of a crash. `data/sample/sample_requests.csv` has 25 held-out packages, with the label removed, for trying the upload. Scoring takes about 6.5 ms per package.
+
+Thresholds changed in the simulator carry over to the review queue for the rest of the session. Decisions are kept for the session only. There's no database, on purpose: this is a demonstration of the workflow, not a production system.
+
+One thing the queue makes obvious: the model's probabilities sit very close to 0 or 1, so on simulated days almost nothing lands in the review tier. That is consistent with the near-perfect test results, and it's also a warning. A model trained without the collection artefacts would be less certain, and the review tier would carry more of the load.
+
 ## Layout so far
 
 ```
 configs/            settings and business assumptions (YAML, every number sourced or labelled)
-data/               download instructions and split lists; raw and processed data stay out of Git
+data/               download instructions, split lists and a sample upload; raw and processed data stay out of Git
 docs/               plan, problem, requirements, literature, research design, data card, log
 images/             matplotlib figures for the report and the app
 notebooks/          exploratory analysis
 reports/tables/     CSV outputs that the report numbers come from
 scripts/            command-line entry points
-src/pkgtriage/      the Python package (config, data, features, models, business, plots)
+app/                Streamlit app (entry point, shared components, pages)
+src/pkgtriage/      the Python package (config, data, features, models, business, services, plots)
 artifacts/          trained model files (not committed)
 ```
 
