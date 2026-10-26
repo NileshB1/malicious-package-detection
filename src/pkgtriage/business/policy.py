@@ -87,25 +87,25 @@ def expected_outcome(rates: TierRates, prevalence: float, a: Assumptions) -> dic
     }
 
 
-def candidate_thresholds(probabilities) -> np.ndarray:
+def candidate_thresholds(probabilities, max_points: int = 400) -> np.ndarray:
     # The calibrated scores bunch up near 0 and 1, so a plain linspace would waste most of its
     # points. Use the observed scores plus a few round values.
     p = np.unique(np.round(np.asarray(probabilities, dtype=float), 6))
     extra = np.array([0.0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
     grid = np.unique(np.concatenate([p, extra]))
-    if len(grid) > 400:
-        grid = np.unique(np.quantile(grid, np.linspace(0, 1, 400)))
+    if len(grid) > max_points:
+        grid = np.unique(np.quantile(grid, np.linspace(0, 1, max_points)))
     return grid
 
 
 def choose_thresholds(
-    probabilities, y, prevalence: float, a: Assumptions
+    probabilities, y, prevalence: float, a: Assumptions, max_points: int = 400
 ) -> tuple[ThresholdPolicy, dict[str, float]]:
     """Cheapest feasible (t_low, t_high) on labelled data. Falls back to the least-overloaded
     pair if nothing fits within capacity."""
     p = np.asarray(probabilities, dtype=float)
     y = np.asarray(y)
-    grid = candidate_thresholds(p)
+    grid = candidate_thresholds(p, max_points)
 
     best, best_key = None, None
     for i, lo in enumerate(grid):

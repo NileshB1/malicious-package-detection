@@ -1,6 +1,6 @@
 """Compare the triage policy with the alternatives a security team actually has.
 
-Thresholds are chosen on the validation split; every number reported here is measured on the test split and then scaled to a request stream 
+Thresholds are chosen on the validation split; every number reported here is measured on the test split and then scaled to a request stream
 with a realistic share of malicious packages.
 These are offline estimates under stated assumptions, not observed savings.
 """
@@ -12,19 +12,23 @@ import pandas as pd
 
 from pkgtriage.business.costs import SENSITIVITY_RANGES, Assumptions
 from pkgtriage.business.policy import (
-    ALLOW,   REVIEW,
-    ThresholdPolicy,  TierRates, choose_thresholds,
-    expected_outcome
+    ALLOW,
+    REVIEW,
+    ThresholdPolicy,
+    TierRates,
+    choose_thresholds,
+    expected_outcome,
 )
 
-PER=10_000  # report counts per 10,000 requests 
-#so scenarios with different volumes
+PER = 10_000  # report counts per 10,000 requests
+# so scenarios with different volumes
 
 
 def policy_rates(test_y, model_p, rule_flags, policy: ThresholdPolicy) -> dict[str, TierRates]:
     rule_tiers = np.where(np.asarray(rule_flags) == 1, REVIEW, ALLOW)
     return {
-        "allow everything": TierRates.everyone(ALLOW), "review everything": TierRates.everyone(REVIEW),
+        "allow everything": TierRates.everyone(ALLOW),
+        "review everything": TierRates.everyone(REVIEW),
         "rule screen (flag to review)": TierRates.from_tiers(rule_tiers, test_y),
         "model triage": TierRates.from_tiers(policy.decide(model_p), test_y),
     }
@@ -33,16 +37,40 @@ def policy_rates(test_y, model_p, rule_flags, policy: ThresholdPolicy) -> dict[s
 def _row(name: str, prevalence_name: str, prevalence: float, out: dict, a: Assumptions) -> dict:
     scale = PER / a.requests_per_day
     return {
-        "scenario": prevalence_name, "prevalence": prevalence,
-        "policy": name,  "reviews_per_day": out["reviews_per_day"],
-        "capacity_used": out["capacity_used"],  "feasible": out["feasible"],
+        "scenario": prevalence_name,
+        "prevalence": prevalence,
+        "policy": name,
+        "reviews_per_day": out["reviews_per_day"],
+        "capacity_used": out["capacity_used"],
+        "feasible": out["feasible"],
         # staff needed to keep up with the reviews this policy generates
         "analysts_needed": out["reviews_per_day"] / a.reviews_per_analyst_per_day,
         "missed_malicious_per_10k": out["missed_malicious_per_day"] * scale,
         "false_blocks_per_10k": out["false_blocks_per_day"] * scale,
-        "cost_per_10k": out["expected_cost_per_day"] * scale,  "review_cost_per_10k": out["review_cost_per_day"] * scale,
-        "miss_cost_per_10k": out["miss_cost_per_day"] * scale,  "false_block_cost_per_10k": out["false_block_cost_per_day"] * scale
+        "cost_per_10k": out["expected_cost_per_day"] * scale,
+        "review_cost_per_10k": out["review_cost_per_day"] * scale,
+        "miss_cost_per_10k": out["miss_cost_per_day"] * scale,
+        "false_block_cost_per_10k": out["false_block_cost_per_day"] * scale,
     }
+
+
+def compare_policies(
+    test_y,
+    test_p,
+    rule_flags,
+    policy: ThresholdPolicy,
+    prevalence: float,
+    a: Assumptions,
+    scenario: str = "custom",
+) -> pd.DataFrame:
+    """All four policies for one prevalence and one set of assumptions (used by the app)."""
+    rates = policy_rates(test_y, test_p, rule_flags, policy)
+    return pd.DataFrame(
+        [
+            _row(name, scenario, prevalence, expected_outcome(r, prevalence, a), a)
+            for name, r in rates.items()
+        ]
+    )
 
 
 def run_scenarios(val_p, val_y, test_p, test_y, rule_flags, scenarios: dict, a: Assumptions):
@@ -52,9 +80,12 @@ def run_scenarios(val_p, val_y, test_p, test_y, rule_flags, scenarios: dict, a: 
         policy, val_out = choose_thresholds(val_p, val_y, prevalence, a)
         thresholds.append(
             {
-                "scenario": name,   "prevalence": prevalence,
-                "t_low": policy.t_low,  "t_high": policy.t_high,
-                "validation_cost_per_day": val_out["expected_cost_per_day"],  "validation_feasible": val_out["feasible"]
+                "scenario": name,
+                "prevalence": prevalence,
+                "t_low": policy.t_low,
+                "t_high": policy.t_high,
+                "validation_cost_per_day": val_out["expected_cost_per_day"],
+                "validation_feasible": val_out["feasible"],
             }
         )
         for pname, rates in policy_rates(test_y, test_p, rule_flags, policy).items():
@@ -63,9 +94,13 @@ def run_scenarios(val_p, val_y, test_p, test_y, rule_flags, scenarios: dict, a: 
 
 
 def bootstrap_policy_cost(
-    test_p, test_y,  policy: ThresholdPolicy, prevalence: float,
+    test_p,
+    test_y,
+    policy: ThresholdPolicy,
+    prevalence: float,
     a: Assumptions,
-    n_boot: int = 1000,  seed: int = 42
+    n_boot: int = 1000,
+    seed: int = 42,
 ) -> dict[str, float]:
     """Interval on the model policy's cost and misses from resampling the test packages."""
     rng = np.random.default_rng(seed)
@@ -81,8 +116,10 @@ def bootstrap_policy_cost(
     lo_c, hi_c = np.percentile(costs, [2.5, 97.5])
     lo_m, hi_m = np.percentile(misses, [2.5, 97.5])
     return {
-        "cost_ci_low": lo_c, "cost_ci_high": hi_c,
-        "missed_ci_low": lo_m,   "missed_ci_high": hi_m
+        "cost_ci_low": lo_c,
+        "cost_ci_high": hi_c,
+        "missed_ci_low": lo_m,
+        "missed_ci_high": hi_m,
     }
 
 
@@ -113,11 +150,14 @@ def sensitivity(
     for name, (low, high) in SENSITIVITY_RANGES.items():
         rows.append(
             {
-                "assumption": name,  "compared_with": against,
-                "base_value": getattr(a, name),  "low_value": low, "high_value": high,
+                "assumption": name,
+                "compared_with": against,
+                "base_value": getattr(a, name),
+                "low_value": low,
+                "high_value": high,
                 "saving_at_low": saving(a.with_changes(**{name: low})),
                 "saving_at_high": saving(a.with_changes(**{name: high})),
-                "saving_at_base": base
+                "saving_at_base": base,
             }
         )
     out = pd.DataFrame(rows)
@@ -159,8 +199,9 @@ def break_even_breach_probability(
             verdict = "alternative cheaper at every breach probability"
         rows.append(
             {
-                "compared_with": name, "break_even_breach_probability": prob if 0 <= prob <= 1 else np.nan,
-                "verdict": verdict
+                "compared_with": name,
+                "break_even_breach_probability": prob if 0 <= prob <= 1 else np.nan,
+                "verdict": verdict,
             }
         )
     return pd.DataFrame(rows)

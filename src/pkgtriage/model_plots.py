@@ -128,3 +128,22 @@ def score_distribution_figure(y, score):
     _legend_above(ax)
     ax.set_title("Score distribution on the test set", pad=18)
     return fig
+
+
+def drivers_figure(drivers):
+    """One package's reasons as a bar chart: orange pushes towards malicious, blue away.
+    Hatched bars come from collection-sensitive features."""
+    d = list(reversed(drivers))
+    labels = [dr.sentence() for dr in d]
+    values = [dr.contribution for dr in d]
+    fig, ax = plt.subplots(figsize=(DOUBLE_COL, 0.42 * len(d) + 0.8))
+    for i, dr in enumerate(d):
+        ax.barh(i, dr.contribution, color=MALICIOUS if dr.raises_risk else BENIGN, height=0.6,
+                hatch="///" if dr.collection_sensitive else None, edgecolor="white")
+    ax.axvline(0, color=INK_SOFT, linewidth=0.8)
+    ax.set_yticks(range(len(d)), labels)
+    ax.set_xlabel("Effect on the score (log-odds): right = more likely malicious")
+    ax.grid(axis="y", visible=False)
+    span = max(abs(v) for v in values) * 1.15 if values else 1
+    ax.set_xlim(-span, span)
+    return fig
