@@ -72,10 +72,8 @@ def expected_outcome(rates: TierRates, prevalence: float, a: Assumptions) -> dic
     )
     return {
         "reviews_per_day": reviews, "capacity_used": reviews / a.review_capacity_per_day,
-        "backlog_per_day": backlog,
-        "feasible": backlog == 0, "missed_malicious_per_day": missed,
-        "false_blocks_per_day": false_blocks,
-        "auto_blocked_malicious_per_day": auto_blocked_malicious,
+        "backlog_per_day": backlog,  "feasible": backlog == 0, "missed_malicious_per_day": missed,
+        "false_blocks_per_day": false_blocks, "auto_blocked_malicious_per_day": auto_blocked_malicious,
         "expected_cost_per_day": cost, "review_cost_per_day": reviews * a.cost_per_review,
         "miss_cost_per_day": missed * a.cost_per_missed_malicious,
         "false_block_cost_per_day": false_blocks * a.cost_per_false_block,
@@ -87,10 +85,11 @@ def candidate_thresholds(probabilities, max_points: int = 400) -> np.ndarray:
     # points. Use the observed scores plus a few round values.
     p = np.unique(np.round(np.asarray(probabilities, dtype=float), 6))
     extra = np.array([0.0, 0.001, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0])
-    grid = np.unique(np.concatenate([p, extra]))
-    if len(grid) > max_points:
-        grid = np.unique(np.quantile(grid, np.linspace(0, 1, max_points)))
-    return grid
+    # thin the observed scores only; the round values must survive, since they are often the
+    # ones that fall in the gap between the classes
+    if len(p) > max_points:
+        p = np.unique(np.quantile(p, np.linspace(0, 1, max_points)))
+    return np.unique(np.concatenate([p, extra]))
 
 
 def choose_thresholds(

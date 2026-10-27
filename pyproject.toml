@@ -39,3 +39,10 @@ select = ["E", "F", "I", "B", "UP"]
 [tool.ruff.lint.isort]
 # app/components.py is imported as a top-level module by the Streamlit pages
 known-first-party = ["pkgtriage", "components"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "needs_artifacts: needs the trained model in artifacts/ (run the training scripts first)",
+]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]

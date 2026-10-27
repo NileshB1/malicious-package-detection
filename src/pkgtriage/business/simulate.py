@@ -12,12 +12,9 @@ import pandas as pd
 
 from pkgtriage.business.costs import SENSITIVITY_RANGES, Assumptions
 from pkgtriage.business.policy import (
-    ALLOW,
-    REVIEW,
-    ThresholdPolicy,
-    TierRates,
-    choose_thresholds,
-    expected_outcome,
+    ALLOW, REVIEW,
+    ThresholdPolicy,  TierRates, choose_thresholds,
+    expected_outcome
 )
 
 PER = 10_000  # report counts per 10,000 requests
@@ -27,8 +24,7 @@ PER = 10_000  # report counts per 10,000 requests
 def policy_rates(test_y, model_p, rule_flags, policy: ThresholdPolicy) -> dict[str, TierRates]:
     rule_tiers = np.where(np.asarray(rule_flags) == 1, REVIEW, ALLOW)
     return {
-        "allow everything": TierRates.everyone(ALLOW),
-        "review everything": TierRates.everyone(REVIEW),
+        "allow everything": TierRates.everyone(ALLOW), "review everything": TierRates.everyone(REVIEW),
         "rule screen (flag to review)": TierRates.from_tiers(rule_tiers, test_y),
         "model triage": TierRates.from_tiers(policy.decide(model_p), test_y),
     }
