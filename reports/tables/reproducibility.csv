@@ -1,0 +1,6 @@
+check,passed,detail
+raw data matches pinned checksum,True,910cb1595f4a
+feature table rebuilds identically,True,"(14270, 49)"
+grouped split regenerates identically,True,
+two training runs give identical predictions,True,
+retrained model matches the saved model,True,max difference 0.00e+00
