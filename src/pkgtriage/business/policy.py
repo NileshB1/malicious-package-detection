@@ -1,4 +1,4 @@
-"""Turning scores into allow / review / block.
+"""Turning scores into allow, review, or block
 
 Below t_low a package is allowed without a human looking at it, at or above t_high it is
 blocked, and everything in between goes to an analyst
@@ -13,7 +13,7 @@ import numpy as np
 from pkgtriage.business.costs import Assumptions
 
 ALLOW, REVIEW, BLOCK = "allow", "review", "block"
-TIERS = (ALLOW, REVIEW, BLOCK)
+TIERS=(ALLOW, REVIEW, BLOCK)
 
 
 @dataclass(frozen=True)
@@ -27,10 +27,8 @@ class TierRates:
     def from_tiers(cls, tiers: np.ndarray, y) -> TierRates:
         y = np.asarray(y)
         mal, ben = tiers[y == 1], tiers[y == 0]
-        return cls(
-            malicious={t: float(np.mean(mal == t)) for t in TIERS},
-            benign={t: float(np.mean(ben == t)) for t in TIERS},
-        )
+        return cls(malicious={t: float(np.mean(mal == t)) for t in TIERS},
+            benign={t: float(np.mean(ben == t)) for t in TIERS})
 
     @classmethod
     def everyone(cls, tier: str) -> TierRates:
@@ -73,15 +71,12 @@ def expected_outcome(rates: TierRates, prevalence: float, a: Assumptions) -> dic
         + false_blocks * a.cost_per_false_block
     )
     return {
-        "reviews_per_day": reviews,
-        "capacity_used": reviews / a.review_capacity_per_day,
+        "reviews_per_day": reviews, "capacity_used": reviews / a.review_capacity_per_day,
         "backlog_per_day": backlog,
-        "feasible": backlog == 0,
-        "missed_malicious_per_day": missed,
+        "feasible": backlog == 0, "missed_malicious_per_day": missed,
         "false_blocks_per_day": false_blocks,
         "auto_blocked_malicious_per_day": auto_blocked_malicious,
-        "expected_cost_per_day": cost,
-        "review_cost_per_day": reviews * a.cost_per_review,
+        "expected_cost_per_day": cost, "review_cost_per_day": reviews * a.cost_per_review,
         "miss_cost_per_day": missed * a.cost_per_missed_malicious,
         "false_block_cost_per_day": false_blocks * a.cost_per_false_block,
     }
