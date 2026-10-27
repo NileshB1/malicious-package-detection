@@ -12,12 +12,15 @@ import pandas as pd
 
 from pkgtriage.business.policy import ThresholdPolicy
 from pkgtriage.config import load_config
+from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models.artifacts import load_bundle
 from pkgtriage.models.dataset import load_splits
 from pkgtriage.models.explain import Explainer
 
 
 def main():
+    log = setup_logging("error_analysis")
+    log.info("analysing test errors")
     cfg = load_config()
     bundle = load_bundle(cfg)
     saved = json.loads((cfg.paths.artifacts_dir / "policy.json").read_text())
@@ -65,4 +68,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "error_analysis")

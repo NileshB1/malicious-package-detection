@@ -16,6 +16,7 @@ from pkgtriage.business.simulate import (
     sensitivity,
 )
 from pkgtriage.config import load_config
+from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models.artifacts import load_bundle
 from pkgtriage.models.dataset import load_splits
 
@@ -23,6 +24,8 @@ BASE = "base"
 
 
 def main():
+    log = setup_logging("run_business_simulation")
+    log.info("simulating policies")
     cfg = load_config()
     a, scenarios = load_assumptions()
     bundle = load_bundle(cfg)
@@ -96,5 +99,5 @@ def main():
 
 #main method
 if __name__ == "__main__":
-    main()
+    run(main, "run_business_simulation")
 

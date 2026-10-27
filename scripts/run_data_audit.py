@@ -5,7 +5,6 @@ Outputs:
     images/eda_*.png    figures for the report
 """
 
-import logging
 
 from pkgtriage import plots
 from pkgtriage.config import load_config
@@ -13,6 +12,7 @@ from pkgtriage.data.audit import run_audit
 from pkgtriage.data.download import load_raw
 from pkgtriage.data.schema import COUNT_COLUMNS
 from pkgtriage.data.validate import validate_raw
+from pkgtriage.logging_config import run, setup_logging
 
 KEY_FEATURES = [
     "Network_Operations",
@@ -25,7 +25,8 @@ KEY_FEATURES = [
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    log = setup_logging("run_data_audit")
+    log.info("validating and auditing raw data")
     cfg = load_config()
     df = load_raw(cfg)
 
@@ -64,4 +65,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "run_data_audit")

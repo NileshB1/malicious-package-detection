@@ -9,7 +9,6 @@ Outputs:
     images/split_family_overlap.png
 """
 
-import logging
 
 import pandas as pd
 
@@ -19,10 +18,12 @@ from pkgtriage.data.download import load_raw
 from pkgtriage.data.split import check_split, grouped_split, random_split
 from pkgtriage.data.validate import validate_raw
 from pkgtriage.features.build import FEATURE_GROUPS, LABEL, NAME, build_features
+from pkgtriage.logging_config import run, setup_logging
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    log = setup_logging("build_dataset")
+    log.info("building features and splits")
     cfg = load_config()
     raw = load_raw(cfg)
     validate_raw(raw, cfg)
@@ -69,4 +70,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "build_dataset")

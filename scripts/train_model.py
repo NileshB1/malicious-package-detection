@@ -6,10 +6,10 @@ Outputs:
     reports/tables/calibration_methods.csv
 """
 
-import logging
 
 from pkgtriage.config import load_config
 from pkgtriage.features.build import FEATURE_COLUMNS
+from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models import train
 from pkgtriage.models.artifacts import ModelBundle, save_bundle
 from pkgtriage.models.baseline import RuleBaseline
@@ -19,7 +19,8 @@ from pkgtriage.models.explain import benign_medians
 
 
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    log = setup_logging("train_model")
+    log.info("tuning and training")
     cfg = load_config()
     splits = load_splits("grouped", cfg)
     tr, val = splits["train"], splits["validation"]
@@ -56,4 +57,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "train_model")

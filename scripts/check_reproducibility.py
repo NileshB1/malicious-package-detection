@@ -14,12 +14,15 @@ from pkgtriage.config import load_config
 from pkgtriage.data.download import load_raw, raw_csv_path, sha256_of
 from pkgtriage.data.split import grouped_split
 from pkgtriage.features.build import FEATURE_COLUMNS, NAME, build_features
+from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models import train
 from pkgtriage.models.artifacts import load_bundle
 from pkgtriage.models.dataset import load_splits
 
 
 def main():
+    log = setup_logging("check_reproducibility")
+    log.info("checking reproducibility")
     cfg = load_config()
     checks = []
 
@@ -60,4 +63,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "check_reproducibility")

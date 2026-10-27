@@ -13,6 +13,7 @@ import pandas as pd
 
 from pkgtriage import model_plots, plots
 from pkgtriage.config import load_config
+from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models.ablation import run_ablations
 from pkgtriage.models.artifacts import load_bundle
 from pkgtriage.models.dataset import load_splits
@@ -21,7 +22,8 @@ from pkgtriage.models.metrics import bootstrap_ci
 
 
 def main():
-    logging.basicConfig(level=logging.WARNING)
+    log = setup_logging("evaluate_model", logging.WARNING)
+    log.info("evaluating on the grouped test set")
     cfg = load_config()
     bundle = load_bundle(cfg)
     test = load_splits("grouped", cfg)["test"]
@@ -71,4 +73,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    run(main, "evaluate_model")
