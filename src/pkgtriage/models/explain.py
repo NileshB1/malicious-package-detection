@@ -96,6 +96,11 @@ class Explainer:
         self.benign_medians = benign_medians.reindex(self.columns)
         self._shap = shap.TreeExplainer(base_model)
 
+    @property
+    def base_value(self) -> float:
+        """Model output (log-odds) before any feature is taken into account."""
+        return float(np.ravel(self._shap.expected_value)[0])
+
     def values(self, X: pd.DataFrame) -> pd.DataFrame:
         X = X[self.columns]
         return pd.DataFrame(self._shap.shap_values(X), columns=self.columns, index=X.index)
