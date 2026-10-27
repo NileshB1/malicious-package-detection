@@ -18,9 +18,28 @@ from pkgtriage.services.scoring import ScoringService
 DECISION_TEXT = {"allow": "Allow", "review": "Send to analyst", "block": "Block"}
 
 
+SETUP_STEPS = (
+    "python scripts/download_data.py\n"
+    "python scripts/build_dataset.py\n"
+    "python scripts/train_model.py\n"
+    "python scripts/run_business_simulation.py"
+)
+
+
 @st.cache_resource(show_spinner="Loading the model...")
-def service() -> ScoringService:
+def _load_service() -> ScoringService:
     return ScoringService()
+
+
+def service() -> ScoringService:
+    # a fresh clone has no model yet; say what to run instead of showing a traceback
+    try:
+        return _load_service()
+    except (FileNotFoundError, RuntimeError) as err:
+        st.error(f"The app can't start yet: {err}")
+        st.markdown("Build the data and model first (or run `.\\tasks.ps1 all`):")
+        st.code(SETUP_STEPS, language="powershell")
+        st.stop()
 
 
 @st.cache_data(show_spinner=False)
