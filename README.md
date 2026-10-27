@@ -14,42 +14,79 @@ This project looks at a middle path. If we watch what a package actually *does* 
 
 The goal is a working tool that helps someone make that decision, not another accuracy table.
 
-## What is planned
+## What it does
 
-- **Data:** QUT-DV25, a public dataset of about 14,000 real PyPI packages (roughly half malicious) whose installation behaviour was recorded with eBPF and strace. It comes from the DySec study by Mehedi et al. (2025)
+- **Data:** [QUT-DV25](https://huggingface.co/datasets/Hugnd-UIT/ML-Based-Malicious-Package-Detection), about 14,000 real PyPI packages (roughly half malicious) whose installation behaviour was recorded with eBPF and strace (Mehedi et al., 2025).
+- **Model:** one calibrated gradient-boosted tree model, with a simple rule-based screen as the reference point.
+- **Honest evaluation:** malicious and benign packages in the dataset were installed in different ways, and the project measures how much that flatters the results.
+- **Decision layer:** an allow / review / block policy that fits the analysts' daily capacity, with workload, missed attacks and cost made visible.
+- **App:** a Streamlit console with a review queue, a per-package explanation, a what-if simulator for managers and the model evidence.
+- **Figures:** every plot is a matplotlib figure in `images/`, sized for the IEEE report.
 
-https://huggingface.co/datasets/Hugnd-UIT/ML-Based-Malicious-Package-Detection
-- **Model:** one gradient-boosted tree model with calibrated probabilities, plus a simple rule-based reference that stands in for how teams often do it today.
-- **Honest evaluation:** while looking at the data I found that malicious and benign packages were installed in different ways (local archive files compared with downloads from PyPI). Part of this project is measuring how much that inflates the published results.
-- **Decision layer:** An allow, review, or block policy that respects how many packages an analyst can realistically review, with costs and workload made visible.
-- **App:** a Streamlit console with a review queue, a case view that explains each decision in plain language, and a what-if page for managers.
-- **Figures:** every plot used in the report is produced with matplotlib and saved to `images/`.
+## Quick start
 
-
-## Setting it up
-
-You need Python 3.12.
+You need Python 3.12 on Windows (other platforms work with the same commands minus the `.ps1`).
 
 ```powershell
-python -m venv .venv
-.venv\Scripts\activate.bat
-pip install -e ".[dev]"
+.\tasks.ps1 setup    # .venv + pinned dependencies from requirements.txt
+.\tasks.ps1 all      # download -> audit -> features -> train -> evaluate -> business results (~7 min)
+.\tasks.ps1 app      # open the app at http://localhost:8501
+.\tasks.ps1 test     # 82 tests
 ```
 
-To check the configuration loads:
+`tasks.ps1` just runs the scripts in `scripts/` in order, so the same thing by hand is:
 
 ```powershell
-python -c "from pkgtriage.config import load_config; print(load_config())"
+python -m venv .venv; .venv\Scripts\activate
+pip install -r requirements.txt; pip install -e . --no-deps
+python scripts/download_data.py          # pinned file, checksum verified
+python scripts/run_data_audit.py         # validation, artefact audit, EDA figures
+python scripts/build_dataset.py          # features and grouped split
+python scripts/train_model.py            # tuning, training, calibration (~3 min)
+python scripts/evaluate_model.py         # test results, robustness checks, SHAP
+python scripts/run_business_simulation.py
+python scripts/error_analysis.py
+streamlit run app/streamlit_app.py
 ```
 
-## Getting the data and looking at it
+`requirements.txt` pins the exact versions that produced the committed results. `pyproject.toml` has looser ranges for anyone who just wants to use the package. Each script logs progress to the console and to `logs/<script>.log` (not committed). If something it needs is missing (data not downloaded, model not trained) it says which script to run and exits, without a traceback.
 
-```powershell
-python scripts/download_data.py      # pinned file, checksum verified
-python scripts/run_data_audit.py     # validation, leakage audit, EDA figures
+`notebooks/01_eda.ipynb` walks through the data exploration with the same functions. Use the "Python (pkgtriage)" kernel that `setup` registers.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    HF[(Hugging Face<br/>QUT-DV25, pinned)] --> D[data<br/>download, validate, audit]
+    D --> F[features<br/>parse text fields,<br/>drop sandbox artefacts]
+    F --> S[grouped split<br/>by package family]
+    S --> M[models<br/>gradient boosting, calibration,<br/>rule baseline, SHAP]
+    M --> B[business<br/>thresholds, costs,<br/>scenarios]
+    M --> SV[services.scoring]
+    B --> SV
+    SV --> APP[Streamlit app]
+    M --> R[(reports/tables, images)]
+    B --> R
 ```
 
-The first run downloads about 16 MB into `data/raw/` (not committed). The audit writes its tables to `reports/tables/` and its figures to `images/eda_*.png`. If you'd rather click through it, `notebooks/01_eda.ipynb` tells the same story with the same functions. Select the "Python (pkgtriage)" kernel, or register it once with `python -m ipykernel install --user --name pkgtriage`.
+The code is one Python package, `src/pkgtriage`, with a folder per stage. Each stage reads the previous stage's saved output, so any step can be rerun on its own.
+
+| Part | Responsibility |
+| --- | --- |
+| `data/` | Pinned download with checksum, schema validation, artefact audit, name families, grouped split |
+| `features/` | Turns the TCP, process, dependency and syscall text into 49 counts; defines the feature groups used for ablations |
+| `models/` | Rule baseline, tuning with family-grouped CV, calibration, metrics, robustness checks, SHAP explanations, saving and loading the model |
+| `business/` | Assumptions from `configs/business.yaml`, the allow / review / block policy, scenario simulation, sensitivity and break-even |
+| `services/scoring.py` | The only thing the app talks to: validates an upload, builds features, scores, decides and explains |
+| `app/` | Pages only. No modelling or business logic lives in the UI |
+| `configs/` | Dataset revision and checksum, paths, seed, split, and every business assumption with its source |
+
+Some decisions behind it:
+
+- **Files, not a database or an API.** The data is a 16 MB CSV and the app is single-user, so saved Parquet, CSV and joblib files keep it simple and easy to inspect.
+- **One model and one baseline.** The question is whether the scores support a decision, not which algorithm wins.
+- **The service layer between model and UI.** The app can be replaced (by an API in front of a package proxy, for example) without touching the model code.
+- **Everything numeric in config.** Thresholds, costs and capacity can be changed without editing code.
 
 ## What the data turned out to look like
 
@@ -59,7 +96,7 @@ The short version: the dataset is real and useful, but the published accuracy is
 - Background processes on the sandbox differ by class. The GNOME file indexer only shows up during malicious runs and a browser thread only during benign ones, which suggests the two classes were recorded in different sessions.
 - About 1,900 rows are variants of the same package (one has 41 versions), so a random train/test split would test the model on things it has basically already seen.
 
-None of this rules the data out. It changes how it has to be used: no names, no environment processes, a split grouped by package family, and ablations to measure how much of the signal is real behaviour. Details are in [docs/data_card.md](docs/data_card.md).
+None of this rules the data out. It changes how it has to be used: no names, no environment processes, a split grouped by package family, and ablations to measure how much of the signal is real behaviour.
 
 ## Where things stand
 
@@ -73,7 +110,8 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 6. Decision policy and business value | Done: allow/review/block thresholds, scenario costs, sensitivity, break-even |
 | 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
 | 8. Testing and validation | Done: 82 automated tests, reproducibility check, error analysis |
-| 9. Deployment and documentation | Next |
+| 9. Deployment and documentation | Done: pinned dependencies, task runner, logging, architecture overview |
+| 10. Report and demo | Next |
 
 ## Features and splits
 
@@ -148,16 +186,6 @@ Two things stand out. First, the grouped split costs less than expected (99.8% c
 - *Known limits:* collection artefacts (above); benign labels not independently verified; 50/50 class balance (Phase 6 re-weights to realistic rates); runtime-only malware is invisible to install traces; one sandbox, one ecosystem.
 - *Artefacts:* `artifacts/model.joblib` (not committed; rebuilt by the training script) with a readable `artifacts/model.json` alongside.
 
-| Document | What's in it |
-| --- | --- |
-| [docs/project_plan.md](docs/project_plan.md) | Ten-phase plan and commit breakdown |
-| [docs/business_problem.md](docs/business_problem.md) | Who has the problem and what decision the tool supports |
-| [docs/requirements.md](docs/requirements.md) | Requirements and success criteria |
-| [docs/literature_log.md](docs/literature_log.md) | Every source, how it was verified, and what it's used for |
-| [docs/literature_review.md](docs/literature_review.md) | Notes for the literature section, and the research gap |
-| [docs/research_design.md](docs/research_design.md) | Research questions, splits, metrics, cost model, threats to validity |
-| [docs/data_card.md](docs/data_card.md) | What the dataset contains and what's wrong with it |
-| [docs/risk_register.md](docs/risk_register.md) | Risks and mitigations |
 
 ## From scores to decisions
 
@@ -250,8 +278,10 @@ For **all 18** mistakes, at least two of the top three reasons come from the col
 
 ```
 configs/            settings and business assumptions (YAML, every number sourced or labelled)
+logs/               script logs (not committed)
+tasks.ps1           runs the pipeline steps in order
+requirements.txt    exact versions used for the committed results
 data/               download instructions, split lists and a sample upload; raw and processed data stay out of Git
-docs/               plan, problem, requirements, literature, research design, data card, log
 images/             matplotlib figures for the report and the app
 notebooks/          exploratory analysis
 reports/tables/     CSV outputs that the report numbers come from

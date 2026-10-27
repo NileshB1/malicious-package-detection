@@ -1,4 +1,4 @@
-"""One test per requirement in docs/requirements.md (FR = functional, NFR = non-functional).
+"""One test per project requirement (FR = functional, NFR = non-functional).
 
 The test names carry the requirement ID so the report can point at them directly.
 Requirements checked by hand are listed at the bottom.
