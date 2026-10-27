@@ -72,7 +72,8 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 5. Primary model | Done: calibrated gradient boosting, rule baseline, robustness checks, SHAP |
 | 6. Decision policy and business value | Done: allow/review/block thresholds, scenario costs, sensitivity, break-even |
 | 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
-| 8. Testing and validation | Next |
+| 8. Testing and validation | Done: 82 automated tests, reproducibility check, error analysis |
+| 9. Deployment and documentation | Next |
 
 ## Features and splits
 
@@ -164,7 +165,7 @@ Two things stand out. First, the grouped split costs less than expected (99.8% c
 python scripts/run_business_simulation.py    # about 2 minutes
 ```
 
-**The policy.** Each package gets one of three outcomes: *allow* if its probability is below `t_low`, *block* if it is at or above `t_high`, and *send to an analyst* if it falls in between. The two thresholds are chosen on the validation split by minimising expected cost, as long as the review tier fits the team's daily capacity. Expected cost here is review time, plus missed malicious packages times the expected breach cost, plus developer time lost to wrongly blocked packages. The outcomes below are then measured on the test split and scaled to a request stream with a realistic share of malicious packages. Base case thresholds: `t_low = 0.158`, `t_high = 0.298` (saved to `artifacts/policy.json` for the app).
+**The policy.** Each package gets one of three outcomes: *allow* if its probability is below `t_low`, *block* if it is at or above `t_high`, and *send to an analyst* if it falls in between. The two thresholds are chosen on the validation split by minimising expected cost, as long as the review tier fits the team's daily capacity. Expected cost here is review time, plus missed malicious packages times the expected breach cost, plus developer time lost to wrongly blocked packages. The outcomes below are then measured on the test split and scaled to a request stream with a realistic share of malicious packages. Base case thresholds: `t_low = 0.145`, `t_high = 0.291` (saved to `artifacts/policy.json` for the app).
 
 **Assumptions** live in `configs/business.yaml`. The breach cost is sourced (IBM 2025: USD 4.91M average for supply chain compromise). Everything else is a labelled assumption: 200 requests a day, 2 analysts doing 12 reviews each, 30 minutes per review, analysts catching 90% of what they review, and a 5% chance that an installed malicious package turns into a breach.
 
@@ -175,7 +176,7 @@ python scripts/run_business_simulation.py    # about 2 minutes
 | Allow everything | 0 | 100 | 0 | $24.6M |
 | Review everything | 16.7 | 10 | 0 | $2.76M |
 | Rule screen, flags go to review | 3.1 | 46 | 0 | $11.4M |
-| **Model triage** | **0.2** | **0.3** | **129** | **$97k** (95% CI $30k-$188k) |
+| **Model triage** | **0.2** | **0.3** | **139** | **$98k** (95% CI $31k-$190k) |
 
 The same pattern holds at 0.1% and 5% malicious (`images/business_cost_by_scenario.png`). With two analysts, only the model policy fits the team's capacity. Reviewing everything would need about 17 people, and the rule screen still sends 37 packages a day (`images/business_workload.png`).
 
@@ -189,7 +190,7 @@ Review time, hourly rates and developer friction barely matter, because one miss
 
 **Break-even** (`reports/tables/break_even.csv`): the model policy beats allowing everything once the chance of a breach per malicious install exceeds 0.004%. It is cheaper than reviewing everything and than the rule screen at any breach probability.
 
-**What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). With behaviour-only features, about six times as many malicious packages slip through at a 1% false-alarm rate, so the "let through" column would rise roughly in proportion. The 129 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
+**What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). With behaviour-only features, about six times as many malicious packages slip through at a 1% false-alarm rate, so the "let through" column would rise roughly in proportion. The 139 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
 
 ## The app
 
@@ -213,6 +214,38 @@ Thresholds changed in the simulator carry over to the review queue for the rest 
 
 One thing the queue makes obvious: the model's probabilities sit very close to 0 or 1, so on simulated days almost nothing lands in the review tier. That is consistent with the near-perfect test results, and it's also a warning. A model trained without the collection artefacts would be less certain, and the review tier would carry more of the load.
 
+## Testing and validation
+
+```powershell
+pytest                                     # 82 tests, about 40 seconds
+python scripts/check_reproducibility.py    # rebuilds features, split and model and compares
+python scripts/error_analysis.py           # what the policy gets wrong on the test set
+```
+
+**Tests** (`tests/`):
+
+| Folder | What's covered |
+| --- | --- |
+| `unit/` (58) | Parsers on normal, empty and malformed cells; name families; validation failures; grouped split never leaks a family; feature table has no name-derived columns and ignores sandbox processes; rule baseline; metrics; unit costs and allow-everything / review-everything costs worked out by hand; threshold search; upload checks |
+| `integration/` (10) | The whole pipeline on 200 real rows (features, split, training, calibration, thresholds, policy comparison); training is deterministic; the real scoring service on traces with no activity, extreme counts and unknown process names; SHAP values add up exactly to the model's raw score |
+| `acceptance/` (14) | One test per requirement ID: FR1-FR9 and NFR1-NFR4, NFR7. NFR5 (tiers have text labels, not colour alone) and NFR6 (fresh Windows setup) were checked by hand |
+
+The tests use `tests/fixtures/qutdv25_sample.csv` (200 rows from the training split). Tests that need the trained model are skipped, not failed, if `artifacts/` is empty.
+
+**A bug the tests caught.** When the threshold search thinned its candidate grid, it also dropped the round values (0.5, 0.9...) that tend to fall in the gap between the classes, so with the coarse grid the app uses it could miss a clean cut. After the fix, the saved thresholds moved slightly (base case 0.145 / 0.291 instead of 0.158 / 0.298). The base-case cost went from $97k to $98k per 10,000 requests, and the number of malicious packages let through didn't change.
+
+**Reproducibility** (`reports/tables/reproducibility.csv`): all five checks pass. The data matches its pinned checksum, features and the grouped split rebuild identically, two training runs give identical predictions, and retraining gives exactly the saved model.
+
+**Where it goes wrong** (`reports/tables/error_confusion.csv`, `error_cases.csv`). On the 2,141 grouped test packages, at the base-case thresholds:
+
+| | Benign | Malicious |
+| --- | --- | --- |
+| Allowed | 1,044 | **3** |
+| Sent to an analyst | 13 | 4 |
+| Blocked | **15** | 1,062 |
+
+For **all 18** mistakes, at least two of the top three reasons come from the collection-sensitive features. The 15 blocked safe packages mostly have no declared dependencies and little network traffic, so they look like they were installed from a local file, which is what the model learned malicious packages look like. The three malicious packages that got through look the other way round. The model's errors are exactly where the dataset's collection artefact predicts they would be, which is the strongest evidence in this project that a behaviour-only model is the safer choice for real use.
+
 ## Layout so far
 
 ```
@@ -224,6 +257,7 @@ notebooks/          exploratory analysis
 reports/tables/     CSV outputs that the report numbers come from
 scripts/            command-line entry points
 app/                Streamlit app (entry point, shared components, pages)
+tests/              unit, integration and acceptance tests, plus a 200-row fixture
 src/pkgtriage/      the Python package (config, data, features, models, business, services, plots)
 artifacts/          trained model files (not committed)
 ```
