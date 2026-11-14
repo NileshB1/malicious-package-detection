@@ -46,6 +46,7 @@ python scripts/train_model.py            # tuning, training, calibration (~3 min
 python scripts/evaluate_model.py         # test results, robustness checks, SHAP
 python scripts/run_business_simulation.py
 python scripts/error_analysis.py
+python scripts/make_report_figures.py   # final figures + every number the report quotes
 streamlit run app/streamlit_app.py
 ```
 
@@ -111,7 +112,7 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
 | 8. Testing and validation | Done: 82 automated tests, reproducibility check, error analysis |
 | 9. Deployment and documentation | Done: pinned dependencies, task runner, logging, architecture overview |
-| 10. Report and demo | Next |
+| 10. Report and demo | Figures and numbers ready: `images/final/`, `reports/tables/key_numbers.csv` |
 
 ## Features and splits
 
@@ -126,7 +127,7 @@ The text columns in the raw table become plain counts:
 | Group | Features | Where they come from |
 | --- | --- | --- |
 | filesystem (7) | access counts for /root, /tmp, /home, /usr, /sys, /etc and other paths | count columns as-is |
-| network (13) | IP and port counts, network syscalls, TCP state counts, traffic on 443, 80 and other ports, connections to raw IP addresses | count columns plus the TCP state dictionary |
+| network (17) | IP and port counts (4), network syscalls (1), total TCP events (1), TCP state counts (6), traffic on 443, 80 and other ports (3), distinct ports (1), connections to raw IP addresses (1) | count columns plus the TCP state dictionary |
 | syscall (14) | file, process, IO, time and security syscall counts; syscall families seen in the n-gram patterns; error codes | count columns plus `Pattern_1` to `Pattern_10` |
 | process (3) | build tools (cc1, ld, rustc...), shell and file utilities, any other process | the five process lists, after removing the sandbox's own processes |
 | dependency (3) | how many total, direct and indirect dependencies were resolved | dependency lists |

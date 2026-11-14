@@ -5,7 +5,7 @@
 #   .\tasks.ps1 app         start the Streamlit app
 #   .\tasks.ps1 test        run the test suite
 #   .\tasks.ps1 <step>      run one step: data, audit, features, train, evaluate, simulate,
-#                           errors, reproduce
+#                           errors, reproduce, report
 #
 # If PowerShell refuses to run the script, allow local scripts for this session first:
 #   Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -26,6 +26,7 @@ $steps = [ordered]@{
     simulate  = "scripts\run_business_simulation.py"
     errors    = "scripts\error_analysis.py"
     reproduce = "scripts\check_reproducibility.py"
+    report    = "scripts\make_report_figures.py"
 }
 
 function Invoke-Native([string[]]$arguments) {
@@ -55,7 +56,7 @@ switch ($Task) {
     }
     "all" {
         # about 6-7 minutes in total; training is the slow part
-        foreach ($name in @("data", "audit", "features", "train", "evaluate", "simulate", "errors")) {
+        foreach ($name in @("data", "audit", "features", "train", "evaluate", "simulate", "errors", "report")) {
             Invoke-Step $name
         }
     }
