@@ -65,6 +65,13 @@ def expected_outcome(rates: TierRates, prevalence: float, a: Assumptions) -> dic
     false_blocks = n_ben * rates.benign[BLOCK]
     auto_blocked_malicious = n_mal * rates.malicious[BLOCK]
 
+    # The base-rate effect: the same tier rates give very different alarm quality once malicious
+    # packages are rare. "Flagged" means sent to an analyst or blocked.
+    flagged_malicious = n_mal * (rates.malicious[REVIEW] + rates.malicious[BLOCK])
+    flagged_benign = n_ben * (rates.benign[REVIEW] + rates.benign[BLOCK])
+    blocked = auto_blocked_malicious + false_blocks
+    flagged = flagged_malicious + flagged_benign
+
     cost = (
         reviews * a.cost_per_review
         + missed * a.cost_per_missed_malicious
@@ -77,7 +84,17 @@ def expected_outcome(rates: TierRates, prevalence: float, a: Assumptions) -> dic
         "expected_cost_per_day": cost, "review_cost_per_day": reviews * a.cost_per_review,
         "miss_cost_per_day": missed * a.cost_per_missed_malicious,
         "false_block_cost_per_day": false_blocks * a.cost_per_false_block,
+        # share of blocked packages that really are malicious (NaN when nothing is blocked)
+        "block_precision": _ratio(auto_blocked_malicious, blocked),
+        # share of flagged packages (review or block) that really are malicious
+        "flag_precision": _ratio(flagged_malicious, flagged),
+        # safe packages flagged for every malicious package flagged
+        "false_alarms_per_real_attack": _ratio(flagged_benign, flagged_malicious),
     }
+
+
+def _ratio(num: float, den: float) -> float:
+    return float(num / den) if den > 0 else float("nan")
 
 
 def candidate_thresholds(probabilities, max_points: int = 400) -> np.ndarray:
