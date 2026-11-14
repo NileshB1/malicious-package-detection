@@ -77,7 +77,8 @@ view["policy"] = view.policy.map(business_plots.POLICY_LABELS)
 view["fits capacity"] = view.feasible.map({True: "yes", False: "no"})
 st.dataframe(
     view[["policy", "reviews_per_day", "analysts_needed", "fits capacity",
-          "missed_malicious_per_10k", "false_blocks_per_10k", "cost_per_10k"]],
+          "missed_malicious_per_10k", "false_blocks_per_10k", "block_precision",
+          "false_alarms_per_real_attack", "cost_per_10k"]],
     width="stretch", hide_index=True,
     column_config={
         "reviews_per_day": st.column_config.NumberColumn("Reviews / day", format="%.1f"),
@@ -86,6 +87,14 @@ st.dataframe(
             "Malicious let through / 10k", format="%.2f"),
         "false_blocks_per_10k": st.column_config.NumberColumn(
             "Safe blocked / 10k", format="%.0f"),
+        "block_precision": st.column_config.NumberColumn(
+            "Blocks that are malicious", format="percent",
+            help="Of the packages this policy blocks, the share that really are malicious. "
+                 "Empty when the policy blocks nothing."),
+        "false_alarms_per_real_attack": st.column_config.NumberColumn(
+            "False alarms per real attack", format="%.1f",
+            help="Safe packages sent to review or blocked, for every malicious package "
+                 "sent to review or blocked."),
         "cost_per_10k": st.column_config.NumberColumn("Expected cost / 10k (USD)", format="%.0f"),
     },
 )
@@ -100,4 +109,9 @@ with c2:
 st.caption(
     "Expected cost = review time + missed malicious packages x breach chance x breach cost + "
     "developer time lost to wrong blocks. Offline estimate under these assumptions."
+)
+st.caption(
+    "Lower the share of malicious requests and watch 'Blocks that are malicious' fall: the "
+    "model's error rates stay the same, but there are far more safe packages for it to get "
+    "wrong. That is why a block should work as a quarantine with an appeal, not a final verdict."
 )

@@ -13,6 +13,9 @@ from pkgtriage.config import Config, load_config
 from pkgtriage.models.baseline import RuleBaseline
 
 BUNDLE_NAME = "model.joblib"
+# Same model settings trained without the collection-sensitive groups (network, dependency,
+# missingness). It gives the cautious, behaviour-only business case next to the main one.
+BEHAVIOUR_BUNDLE_NAME = "model_behaviour.joblib"
 
 
 @dataclass
@@ -30,12 +33,12 @@ class ModelBundle:
         return self.model.predict_proba(X[self.features])[:, 1]
 
 
-def bundle_path(cfg: Config | None = None) -> Path:
+def bundle_path(cfg: Config | None = None, name: str = BUNDLE_NAME) -> Path:
     cfg = cfg or load_config()
-    return cfg.paths.artifacts_dir / BUNDLE_NAME
+    return cfg.paths.artifacts_dir / name
 
 
-def save_bundle(bundle: ModelBundle, cfg: Config | None = None) -> Path:
+def save_bundle(bundle: ModelBundle, cfg: Config | None = None, name: str = BUNDLE_NAME) -> Path:
     cfg = cfg or load_config()
     bundle.meta.update(
         {
@@ -45,7 +48,7 @@ def save_bundle(bundle: ModelBundle, cfg: Config | None = None) -> Path:
             "seed": cfg.seed,
         }
     )
-    path = bundle_path(cfg)
+    path = bundle_path(cfg, name)
     path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(bundle, path)
 
@@ -61,8 +64,8 @@ def save_bundle(bundle: ModelBundle, cfg: Config | None = None) -> Path:
     return path
 
 
-def load_bundle(cfg: Config | None = None) -> ModelBundle:
-    path = bundle_path(cfg)
+def load_bundle(cfg: Config | None = None, name: str = BUNDLE_NAME) -> ModelBundle:
+    path = bundle_path(cfg, name)
     if not path.exists():
         raise FileNotFoundError(f"{path} not found - run scripts/train_model.py first")
     bundle = joblib.load(path)

@@ -31,7 +31,7 @@ You need Python 3.12 on Windows (other platforms work with the same commands min
 .\tasks.ps1 setup    # .venv + pinned dependencies from requirements.txt
 .\tasks.ps1 all      # download -> audit -> features -> train -> evaluate -> business results (~7 min)
 .\tasks.ps1 app      # open the app at http://localhost:8501
-.\tasks.ps1 test     # 82 tests
+.\tasks.ps1 test     # 87 tests
 ```
 
 `tasks.ps1` just runs the scripts in `scripts/` in order, so the same thing by hand is:
@@ -110,7 +110,7 @@ None of this rules the data out. It changes how it has to be used: no names, no 
 | 5. Primary model | Done: calibrated gradient boosting, rule baseline, robustness checks, SHAP |
 | 6. Decision policy and business value | Done: allow/review/block thresholds, scenario costs, sensitivity, break-even |
 | 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
-| 8. Testing and validation | Done: 82 automated tests, reproducibility check, error analysis |
+| 8. Testing and validation | Done: 87 automated tests, reproducibility check, error analysis |
 | 9. Deployment and documentation | Done: pinned dependencies, task runner, logging, architecture overview |
 | 10. Report and demo | Figures and numbers ready: `images/final/`, `reports/tables/key_numbers.csv` |
 
@@ -185,7 +185,7 @@ Two things stand out. First, the grouped split costs less than expected (99.8% c
 - *Intended use:* ranking sandboxed install traces for review by a security analyst. Not for labelling packages as malicious in public.
 - *Training data:* QUT-DV25, 9,988 packages (train), 2,141 (validation, calibration only), 2,141 (test, used once).
 - *Known limits:* collection artefacts (above); benign labels not independently verified; 50/50 class balance (Phase 6 re-weights to realistic rates); runtime-only malware is invisible to install traces; one sandbox, one ecosystem.
-- *Artefacts:* `artifacts/model.joblib` (not committed; rebuilt by the training script) with a readable `artifacts/model.json` alongside.
+- *Artefacts:* `artifacts/model.joblib` (not committed; rebuilt by the training script) with a readable `artifacts/model.json` alongside. The training script also saves `artifacts/model_behaviour.joblib`: the same settings trained on the 24 behaviour features only, used to price the conservative business case below.
 
 
 ## From scores to decisions
@@ -209,6 +209,32 @@ python scripts/run_business_simulation.py    # about 2 minutes
 
 The same pattern holds at 0.1% and 5% malicious (`images/business_cost_by_scenario.png`). With two analysts, only the model policy fits the team's capacity. Reviewing everything would need about 17 people, and the rule screen still sends 37 packages a day (`images/business_workload.png`).
 
+**The base-rate effect** (`reports/tables/base_rate_effect.csv`). The test set is 50% malicious, real request streams are not. Keeping the base-case thresholds fixed and only changing the share of malicious requests:
+
+| Malicious share | Blocked packages that are malicious | False alarms per real attack |
+| --- | --- | --- |
+| 50% (test set) | 98.6% | 0.03 |
+| 5% | 78.9% | 0.5 |
+| 1% (base case) | 41.8% | 2.6 |
+| 0.1% | 6.6% | 26 |
+
+The model's error rates don't change; there are just far more safe packages for it to get wrong. At 1% malicious, more than half of all blocks hit safe packages, so a block should work as a quarantine with a quick appeal, not a final verdict. "False alarms" counts safe packages sent to review or blocked; "real attack" counts malicious packages sent to review or blocked. The policy simulator in the app shows both numbers for any setting.
+
+**The conservative case: behaviour-only model** (`reports/tables/business_model_variants.csv`). The same simulation, with thresholds re-chosen on validation, for the model trained without the network, dependency and missingness groups:
+
+| Base case, per 10,000 requests | All features | Behaviour only |
+| --- | --- | --- |
+| Thresholds (allow below / block at or above) | 0.145 / 0.291 | 0.058 / 0.209 |
+| Reviews per day (capacity 24) | 2.4 | 18.3 |
+| Analysts needed | 0.2 | 1.5 |
+| Malicious let through | 0.3 | 0.6 |
+| Safe packages blocked | 139 | 674 |
+| Blocked packages that are malicious | 41.8% | 12.8% |
+| Expected cost | $98k | $255k |
+| Saving against review everything | $2.66M | $2.50M |
+
+The less certain model doesn't let many more attacks through, because the cost-minimising thresholds move: it sends about eight times as many packages to analysts (still within the two-person capacity) and blocks about five times as many safe ones. The saving against reviewing everything barely moves. What the artefact really buys the full model is a quieter queue and fewer wrong blocks, not fewer missed attacks.
+
 **What drives the saving** (`images/business_sensitivity.png`, `reports/tables/sensitivity.csv`). Against a fully staffed review-everything process, the saving per 10,000 requests is $2.66M in the base case. It is most sensitive to:
 
 - *breach probability per malicious install*: $0.76M saving at 1%, $24M at 50%
@@ -219,7 +245,7 @@ Review time, hourly rates and developer friction barely matter, because one miss
 
 **Break-even** (`reports/tables/break_even.csv`): the model policy beats allowing everything once the chance of a breach per malicious install exceeds 0.004%. It is cheaper than reviewing everything and than the rule screen at any breach probability.
 
-**What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). With behaviour-only features, about six times as many malicious packages slip through at a 1% false-alarm rate, so the "let through" column would rise roughly in proportion. The 139 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
+**What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). The behaviour-only business case above is the more conservative estimate for a sandbox where every package is installed the same way. The 139 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
 
 ## The app
 
@@ -246,7 +272,7 @@ One thing the queue makes obvious: the model's probabilities sit very close to 0
 ## Testing and validation
 
 ```powershell
-pytest                                     # 82 tests, about 40 seconds
+pytest                                     # 87 tests, about 40 seconds
 python scripts/check_reproducibility.py    # rebuilds features, split and model and compares
 python scripts/error_analysis.py           # what the policy gets wrong on the test set
 ```
@@ -255,8 +281,8 @@ python scripts/error_analysis.py           # what the policy gets wrong on the t
 
 | Folder | What's covered |
 | --- | --- |
-| `unit/` (58) | Parsers on normal, empty and malformed cells; name families; validation failures; grouped split never leaks a family; feature table has no name-derived columns and ignores sandbox processes; rule baseline; metrics; unit costs and allow-everything / review-everything costs worked out by hand; threshold search; upload checks |
-| `integration/` (10) | The whole pipeline on 200 real rows (features, split, training, calibration, thresholds, policy comparison); training is deterministic; the real scoring service on traces with no activity, extreme counts and unknown process names; SHAP values add up exactly to the model's raw score |
+| `unit/` (61) | Parsers on normal, empty and malformed cells; name families; validation failures; grouped split never leaks a family; feature table has no name-derived columns and ignores sandbox processes; rule baseline; metrics; unit costs and allow-everything / review-everything costs worked out by hand; threshold search; upload checks; block precision and false alarms per real attack worked out by hand, and falling as attacks get rarer |
+| `integration/` (12) | The whole pipeline on 200 real rows (features, split, training, calibration, thresholds, policy comparison); training is deterministic; the real scoring service on traces with no activity, extreme counts and unknown process names; SHAP values add up exactly to the model's raw score; the saved behaviour-only model contains none of the collection-sensitive features |
 | `acceptance/` (14) | One test per requirement ID: FR1-FR9 and NFR1-NFR4, NFR7. NFR5 (tiers have text labels, not colour alone) and NFR6 (fresh Windows setup) were checked by hand |
 
 The tests use `tests/fixtures/qutdv25_sample.csv` (200 rows from the training split). Tests that need the trained model are skipped, not failed, if `artifacts/` is empty.

@@ -11,7 +11,11 @@ from pkgtriage.business.policy import (
     choose_thresholds,
     expected_outcome,
 )
-from pkgtriage.business.simulate import break_even_breach_probability, compare_policies
+from pkgtriage.business.simulate import (
+    base_rate_effect,
+    break_even_breach_probability,
+    compare_policies,
+)
 
 
 class TestCosts:
@@ -64,6 +68,22 @@ class TestPolicy:
         assert out["backlog_per_day"] == pytest.approx(176)
         assert not out["feasible"]
 
+    def test_alarm_quality_by_hand(self, simple_assumptions):
+        rates = TierRates(
+            malicious={ALLOW: 0.0, REVIEW: 0.5, BLOCK: 0.5},
+            benign={ALLOW: 0.9, REVIEW: 0.05, BLOCK: 0.05},
+        )
+        out = expected_outcome(rates, 0.01, simple_assumptions)
+        # 200 requests: 2 malicious (1 reviewed, 1 blocked), 198 safe (9.9 reviewed, 9.9 blocked)
+        assert out["block_precision"] == pytest.approx(1 / (1 + 9.9))
+        assert out["flag_precision"] == pytest.approx(2 / (2 + 19.8))
+        assert out["false_alarms_per_real_attack"] == pytest.approx(19.8 / 2)
+
+    def test_alarm_quality_undefined_when_nothing_flagged(self, simple_assumptions):
+        out = expected_outcome(TierRates.everyone(ALLOW), 0.01, simple_assumptions)
+        assert np.isnan(out["block_precision"])
+        assert np.isnan(out["false_alarms_per_real_attack"])
+
     def test_choose_thresholds_on_separable_scores(self, simple_assumptions):
         rng = np.random.default_rng(1)
         y = np.r_[np.zeros(300), np.ones(300)]
@@ -88,6 +108,19 @@ class TestSimulate:
         # a rule screen that never fires behaves exactly like allowing everything
         costs = table.set_index("policy").cost_per_10k
         assert costs["rule screen (flag to review)"] == pytest.approx(costs["allow everything"])
+
+    def test_base_rate_effect(self, simple_assumptions):
+        # one safe package in ten is blocked; every malicious package is blocked
+        y = np.r_[np.zeros(10), np.ones(10)]
+        p = np.r_[np.full(9, 0.01), 0.95, np.full(10, 0.99)]
+        table = base_rate_effect(p, y, ThresholdPolicy(0.1, 0.9), simple_assumptions)
+        by = table.set_index("setting")
+        # balanced: 10 malicious and 1 safe blocked per 11 blocks
+        assert by.loc["test set (balanced)", "block_precision"] == pytest.approx(10 / 11)
+        # same thresholds, rarer attacks: precision only goes down
+        assert list(table.block_precision) == sorted(table.block_precision, reverse=True)
+        # 1% malicious: 0.01 x 1.0 against 0.99 x 0.1 blocked
+        assert by.loc["base", "block_precision"] == pytest.approx(0.01 / (0.01 + 0.099))
 
     def test_break_even_against_allow_everything(self, simple_assumptions):
         y = np.array([0, 0, 1, 1])

@@ -2,16 +2,17 @@
 
 Outputs:
     artifacts/model.joblib, artifacts/model.json
+    artifacts/model_behaviour.joblib, artifacts/model_behaviour.json  (behaviour-only variant)
     reports/tables/cv_results.csv
     reports/tables/calibration_methods.csv
 """
 
 
 from pkgtriage.config import load_config
-from pkgtriage.features.build import FEATURE_COLUMNS
+from pkgtriage.features.build import COLLECTION_SENSITIVE, FEATURE_COLUMNS, columns_for
 from pkgtriage.logging_config import run, setup_logging
 from pkgtriage.models import train
-from pkgtriage.models.artifacts import ModelBundle, save_bundle
+from pkgtriage.models.artifacts import BEHAVIOUR_BUNDLE_NAME, ModelBundle, save_bundle
 from pkgtriage.models.baseline import RuleBaseline
 from pkgtriage.models.calibrate import calibrate
 from pkgtriage.models.dataset import load_splits
@@ -50,6 +51,24 @@ def main():
     )
     path = save_bundle(bundle, cfg)
     print(f"\nsaved {path}")
+
+    # Behaviour-only variant: same model and settings, without the groups the install method
+    # leaks into. Not a second model choice - it prices the conservative case in Phase 6.
+    behaviour_cols = columns_for(drop=COLLECTION_SENSITIVE)
+    b_base = train.fit(tr, params, cfg.seed, behaviour_cols)
+    b_model, b_calib = calibrate(b_base, val, cfg.seed)
+    behaviour = ModelBundle(
+        model=b_model,
+        base_model=b_base,
+        baseline=baseline,
+        features=behaviour_cols,
+        params=params,
+        calibration=b_calib.sort_values("brier").iloc[0].method,
+        benign_medians=benign_medians(tr.X, tr.y),
+        meta={"train_rows": len(tr), "validation_rows": len(val), "variant": "behaviour only"},
+    )
+    path = save_bundle(behaviour, cfg, BEHAVIOUR_BUNDLE_NAME)
+    print(f"saved {path} ({len(behaviour_cols)} behaviour features, {behaviour.calibration})")
 
     cfg.paths.tables_dir.mkdir(parents=True, exist_ok=True)
     cv_results.to_csv(cfg.paths.tables_dir / "cv_results.csv", index=False)

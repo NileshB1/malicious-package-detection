@@ -43,7 +43,40 @@ def _row(name: str, prevalence_name: str, prevalence: float, out: dict, a: Assum
         "cost_per_10k": out["expected_cost_per_day"] * scale,  "review_cost_per_10k": out["review_cost_per_day"] * scale,
         "miss_cost_per_10k": out["miss_cost_per_day"] * scale,
         "false_block_cost_per_10k": out["false_block_cost_per_day"] * scale,
+        "block_precision": out["block_precision"],
+        "flag_precision": out["flag_precision"],
+        "false_alarms_per_real_attack": out["false_alarms_per_real_attack"],
     }
+
+
+# The balanced test set itself, then the business scenarios. Used to show the base-rate effect.
+BASE_RATE_PREVALENCES = {"test set (balanced)": 0.5, "high": 0.05, "base": 0.01, "low": 0.001}
+
+
+def base_rate_effect(
+    test_p, test_y, policy: ThresholdPolicy, a: Assumptions,
+    prevalences: dict[str, float] = BASE_RATE_PREVALENCES,
+) -> pd.DataFrame:
+    """Alarm quality of one fixed policy as malicious packages get rarer.
+
+    The thresholds don't move, so the tier rates don't move either; only the mix of the request
+    stream changes. This isolates the base-rate effect (H3 in docs/research_design.md).
+    """
+    rates = TierRates.from_tiers(policy.decide(test_p), test_y)
+    scale = PER / a.requests_per_day
+    rows = []
+    for name, prevalence in prevalences.items():
+        out = expected_outcome(rates, prevalence, a)
+        rows.append({
+            "setting": name, "prevalence": prevalence,
+            "t_low": policy.t_low, "t_high": policy.t_high,
+            "malicious_blocked_per_10k": out["auto_blocked_malicious_per_day"] * scale,
+            "safe_blocked_per_10k": out["false_blocks_per_day"] * scale,
+            "block_precision": out["block_precision"],
+            "flag_precision": out["flag_precision"],
+            "false_alarms_per_real_attack": out["false_alarms_per_real_attack"],
+        })
+    return pd.DataFrame(rows)
 
 
 def compare_policies(
