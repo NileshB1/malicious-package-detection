@@ -1,327 +1,222 @@
-# Behaviour based detection of malicious Python packages
+# Malicious Package Detection for Software Supply-Chain Security
 
-**A Machine Learning approach to software supply chain security**
+**MSc Data Analytics, Domain Applications, National College of Ireland**
 
-MSc Data Analytics, Domain Applications project, National College of Ireland (2026)
+A triage tool that watches what a Python package **does while it installs** in a sandbox and tells a
+security team whether to **allow** it, **send it to an analyst**, or **block** it, and what that
+decision is worth in analyst time, missed attacks and cost.
 
-## Why this project exists
+---
 
-Most companies install open-source Python packages from PyPI every day without much thought. That trust is easy to abuse. Attackers upload packages with names close to popular ones (`beautiifulsoup4` instead of `beautifulsoup4`), and some of them run harmful code the moment someone types `pip install`. By the time anyone reads the source, the damage is done.
+## The problem
 
-Security teams that try to vet new packages end up stuck between two bad options. They can review everything by hand, which is slow and makes developers wait, or they can let everything through and hope for the best.
+Anyone can publish to PyPI. Attackers upload packages with names one keystroke away from popular
+ones (`beautiifulsoup4` instead of `beautifulsoup4`), and the harmful code often runs the moment
+someone types `pip install`.
 
-This project looks at a middle path. If we watch what a package actually *does* while it installs in a sandbox (which folders it touches, which connections it opens, which programs it starts), can a model tell a security analyst which packages are probably fine, which ones need a human to look at them, and which ones should be blocked straight away? And what would that save the team in review time and risk?
+| | Numbers |
+|---|---|
+| Malicious open-source packages found 2019-2024 | **704,000+** (Sonatype) |
+| Average cost of a supply-chain breach | **USD 4.91M** (IBM, 2025) |
+| Requests a two-person security team has to vet | **~200 a day** (assumption) |
 
-The goal is a working tool that helps someone make that decision, not another accuracy table.
+A small team has three bad options today: review everything (needs about 17 analysts), use simple
+rules (miss most attacks), or let everything through.
 
-## What it does
+---
 
-- **Data:** [QUT-DV25](https://huggingface.co/datasets/Hugnd-UIT/ML-Based-Malicious-Package-Detection), about 14,000 real PyPI packages (roughly half malicious) whose installation behaviour was recorded with eBPF and strace (Mehedi et al., 2025).
-- **Model:** one calibrated gradient-boosted tree model, with a simple rule-based screen as the reference point.
-- **Honest evaluation:** malicious and benign packages in the dataset were installed in different ways, and the project measures how much that flatters the results.
-- **Decision layer:** an allow / review / block policy that fits the analysts' daily capacity, with workload, missed attacks and cost made visible.
-- **App:** a Streamlit console with a review queue, a per-package explanation, a what-if simulator for managers and the model evidence.
-- **Figures:** every plot is a matplotlib figure in `images/`, sized for the IEEE report.
+## Base paper: DySec
 
-## Quick start
+**DySec** (Mehedi et al., 2025, [arXiv:2503.00324](https://arxiv.org/abs/2503.00324)) installs each
+PyPI package in an isolated sandbox and records its behaviour with eBPF and strace: files touched,
+network connections, processes started, dependencies resolved and system-call patterns. It reports
+**about 96% accuracy**. The traces are public as **QUT-DV25**: 14,270 packages, half malicious.
 
-You need Python 3.12 on Windows (other platforms work with the same commands minus the `.ps1`).
+DySec shows behaviour works. It stops at a label.
 
-```powershell
-.\tasks.ps1 setup    # .venv + pinned dependencies from requirements.txt
-.\tasks.ps1 all      # download -> audit -> features -> train -> evaluate -> business results (~7 min)
-.\tasks.ps1 app      # open the app at http://localhost:8501
-.\tasks.ps1 test     # 87 tests
+---
+
+## Research gaps and how this project closes them
+
+| Gap in the base study | What this project does |
+|---|---|
+| **G1. The test is easier than real life.** Malicious packages were installed from local files, safe ones from PyPI, and near-copies of the same package sit on both sides of a random split. | Drops the giveaway fields, splits by **package family**, and retrains on **behaviour only** to measure how much the install method helps |
+| **G2. Real attacks are rare.** The data is 50/50; in a company perhaps 1 request in 100 is malicious. | Re-prices every business result at **0.1%, 1% and 5%** malicious and reports how many blocks are real attacks |
+| **G3. A score is not a decision.** No allow/review/block, no analyst capacity, no cost. | Chooses **allow / review / block thresholds** that minimise expected cost within the team's daily capacity |
+
+No new algorithm and no algorithm bake-off: **one existing model**, applied to a real business decision.
+
+---
+
+## How it works
+
+```
+                 Developer asks to install a package
+                                 |
+              Sandbox installs it once and records a trace
+                                 |
+          49 behaviour features (files, network, syscalls, processes)
+                                 |
+            Calibrated gradient boosting  ->  P(malicious)
+                                 |
+          +----------------------+----------------------+
+          |                      |                      |
+        Allow            Send to an analyst        Block (quarantine,
+     P < 0.145          with the SHAP reasons       appeal)  P >= 0.291
 ```
 
-`tasks.ps1` just runs the scripts in `scripts/` in order, so the same thing by hand is:
+- **Model:** scikit-learn `HistGradientBoostingClassifier`, tuned with 5-fold cross-validation grouped
+  by package family, then **calibrated** so that a score of 0.8 means about 80% likely malicious.
+- **Thresholds:** chosen on the validation set to **minimise expected cost** (review time + missed
+  attacks + wrongly blocked packages) while the review queue fits a two-person team (24 a day).
+- **Explanations:** every decision shows its strongest **SHAP** reasons in plain words, for example
+  *"file accesses in home directories: 3,857 (typical benign install: 675)"*.
+- **Baseline:** six hand-written rules (root, /etc and home-folder access, shell tools...) of the kind
+  a security team would write without machine learning.
 
-```powershell
-python -m venv .venv; .venv\Scripts\activate
-pip install -r requirements.txt; pip install -e . --no-deps
-python scripts/download_data.py          # pinned file, checksum verified
-python scripts/run_data_audit.py         # validation, artefact audit, EDA figures
-python scripts/build_dataset.py          # features and grouped split
-python scripts/train_model.py            # tuning, training, calibration (~3 min)
-python scripts/evaluate_model.py         # test results, robustness checks, SHAP
-python scripts/run_business_simulation.py
-python scripts/error_analysis.py
-python scripts/make_report_figures.py   # final figures + every number the report quotes
-streamlit run app/streamlit_app.py
-```
+---
 
-`requirements.txt` pins the exact versions that produced the committed results. `pyproject.toml` has looser ranges for anyone who just wants to use the package. Each script logs progress to the console and to `logs/<script>.log` (not committed). If something it needs is missing (data not downloaded, model not trained) it says which script to run and exits, without a traceback.
+## What the data audit found
 
-`notebooks/01_eda.ipynb` walks through the data exploration with the same functions. Use the "Python (pkgtriage)" kernel that `setup` registers.
+The dataset is real and useful, but the two classes were collected differently.
 
-## Architecture
+<p align="center"><img src="images/eda_missingness_by_class.png" width="560" alt="Share of rows with each text field missing, by class"></p>
 
-```mermaid
-flowchart LR
-    HF[(Hugging Face<br/>QUT-DV25, pinned)] --> D[data<br/>download, validate, audit]
-    D --> F[features<br/>parse text fields,<br/>drop sandbox artefacts]
-    F --> S[grouped split<br/>by package family]
-    S --> M[models<br/>gradient boosting, calibration,<br/>rule baseline, SHAP]
-    M --> B[business<br/>thresholds, costs,<br/>scenarios]
-    M --> SV[services.scoring]
-    B --> SV
-    SV --> APP[Streamlit app]
-    M --> R[(reports/tables, images)]
-    B --> R
-```
+- Every malicious package has an archive name (`x-1.0.tar.gz`); **no** benign one does. The name is never used as a feature.
+- Dependency fields are empty for **99.99%** of malicious packages but only 49.6% of benign ones. That one blank field alone gives a ROC-AUC of 0.75.
+- **1,895** packages are near-copies in 585 families (one has 41 versions). A random split would leak **256** of them into the test set; the family split leaks none.
 
-The code is one Python package, `src/pkgtriage`, with a folder per stage. Each stage reads the previous stage's saved output, so any step can be rerun on its own.
+---
 
-| Part | Responsibility |
-| --- | --- |
-| `data/` | Pinned download with checksum, schema validation, artefact audit, name families, grouped split |
-| `features/` | Turns the TCP, process, dependency and syscall text into 49 counts; defines the feature groups used for ablations |
-| `models/` | Rule baseline, tuning with family-grouped CV, calibration, metrics, robustness checks, SHAP explanations, saving and loading the model |
-| `business/` | Assumptions from `configs/business.yaml`, the allow / review / block policy, scenario simulation, sensitivity and break-even |
-| `services/scoring.py` | The only thing the app talks to: validates an upload, builds features, scores, decides and explains |
-| `app/` | Pages only. No modelling or business logic lives in the UI |
-| `configs/` | Dataset revision and checksum, paths, seed, split, and every business assumption with its source |
+## Results
 
-Some decisions behind it:
+Tested once on **2,141 packages from families the model never saw**.
 
-- **Files, not a database or an API.** The data is a 16 MB CSV and the app is single-user, so saved Parquet, CSV and joblib files keep it simple and easy to inspect.
-- **One model and one baseline.** The question is whether the scores support a decision, not which algorithm wins.
-- **The service layer between model and UI.** The app can be replaced (by an API in front of a package proxy, for example) without touching the model code.
-- **Everything numeric in config.** Thresholds, costs and capacity can be changed without editing code.
+| Model | PR-AUC | Malicious caught at 1% false alarms |
+|---|---|---|
+| **Gradient boosting (calibrated)** | **0.999** | **99.3%** |
+| Same model, **behaviour only** (no install-method clues) | 0.997 | **95.6%** |
+| Six hand-written rules | 0.740 | 18.2% |
 
-## What the data turned out to look like
+<p align="center"><img src="images/model_ablation.png" width="560" alt="Recall when the model is retrained on different feature groups"></p>
 
-The short version: the dataset is real and useful, but the published accuracy is probably flattered by how it was collected.
+**The honest finding:** about two-thirds of the full model's SHAP attribution falls on features
+affected by how packages were installed. Take them away and it still catches **95.6%** of attacks,
+so the behaviour signal is real, but **95.6% is the number to trust** for a company where every
+package is installed the same way.
 
-- Every malicious sample was installed from a local `.tar.gz` file, and every benign one was downloaded from PyPI. The pip logs show it plainly, and it leaks into other columns: dependency fields are almost always empty for malicious rows, and benign installs show *more* network traffic, not less.
-- Background processes on the sandbox differ by class. The GNOME file indexer only shows up during malicious runs and a browser thread only during benign ones, which suggests the two classes were recorded in different sessions.
-- About 1,900 rows are variants of the same package (one has 41 versions), so a random train/test split would test the model on things it has basically already seen.
+<p align="center"><img src="images/model_shap_importance.png" width="520" alt="Mean absolute SHAP value of the strongest features"></p>
 
-None of this rules the data out. It changes how it has to be used: no names, no environment processes, a split grouped by package family, and ablations to measure how much of the signal is real behaviour.
+---
 
-## Where things stand
+## Business value
 
-| Phase | Status |
-| --- | --- |
-| 1. Business problem, requirements, scope | Done |
-| 2. Literature review and research design | Done: 34 verified sources, research questions fixed before modelling |
-| 3. Data acquisition and understanding | Done: pinned download, validation, artefact audit, EDA |
-| 4. Feature engineering and grouped split | Done: 49 numeric features in 6 groups, family-grouped 70/15/15 split |
-| 5. Primary model | Done: calibrated gradient boosting, rule baseline, robustness checks, SHAP |
-| 6. Decision policy and business value | Done: allow/review/block thresholds, scenario costs, sensitivity, break-even |
-| 7. Streamlit application | Done: review queue, package detail, policy simulator, model evidence |
-| 8. Testing and validation | Done: 87 automated tests, reproducibility check, error analysis |
-| 9. Deployment and documentation | Done: pinned dependencies, task runner, logging, architecture overview |
-| 10. Report and demo | Figures and numbers ready: `images/final/`, `reports/tables/key_numbers.csv` |
+Per **10,000 requests** with **1% malicious** and a two-person team:
 
-## Features and splits
-
-```powershell
-python scripts/build_dataset.py
-```
-
-This writes `data/processed/features.parquet` (not committed), the split lists in `data/splits/` (committed, so everyone trains and tests on the same packages), two summary tables, and `images/split_family_overlap.png`.
-
-The text columns in the raw table become plain counts:
-
-| Group | Features | Where they come from |
-| --- | --- | --- |
-| filesystem (7) | access counts for /root, /tmp, /home, /usr, /sys, /etc and other paths | count columns as-is |
-| network (17) | IP and port counts (4), network syscalls (1), total TCP events (1), TCP state counts (6), traffic on 443, 80 and other ports (3), distinct ports (1), connections to raw IP addresses (1) | count columns plus the TCP state dictionary |
-| syscall (14) | file, process, IO, time and security syscall counts; syscall families seen in the n-gram patterns; error codes | count columns plus `Pattern_1` to `Pattern_10` |
-| process (3) | build tools (cc1, ld, rustc...), shell and file utilities, any other process | the five process lists, after removing the sandbox's own processes |
-| dependency (3) | how many total, direct and indirect dependencies were resolved | dependency lists |
-| missingness (5) | whether the dependency, pattern and process fields were empty | all text columns |
-
-Things that are deliberately left out:
-
-- `Package_Name` and anything derived from it. The name format alone gives the label away.
-- The tracing tools, desktop services and installer processes listed in `src/pkgtriage/data/schema.py`.
-- Individual process or dependency names. Choosing them after seeing which class they appear in would fit the features to the answer.
-
-The network, dependency and missingness groups are flagged as *collection-sensitive* in `src/pkgtriage/features/build.py`, because they partly reflect whether a package came from PyPI or from a local file. Phase 5 trains with and without them to see how much of the result rests on them.
-
-**Splits.** Packages are grouped into name families (`bytedtrace`, `bytedtrace2`, ... count as one), and whole families go to train, validation or test. The split is stratified, so each part is 49.9% malicious. A plain random split is also saved, purely for comparison: with it, 256 of the 2,141 test packages have a near-identical sibling in the training data. With the grouped split that number is zero.
-
-## The model
-
-```powershell
-python scripts/train_model.py       # about 3 minutes: tuning, training, calibration
-python scripts/evaluate_model.py    # test-set results, robustness checks, SHAP, figures
-```
-
-**What it is.** A single `HistGradientBoostingClassifier` from scikit-learn. Gradient-boosted trees are a good fit for this kind of skewed count data with gaps, they're fast enough to score each package request as it comes in, and they were the strongest family in the original DySec work, so there was no reason to run another bake-off. The settings were picked with a small grid search (16 combinations) using 5-fold cross-validation that keeps package families together. The model then gets sigmoid calibration on the validation set, so that "0.8" really means about 80% likely to be malicious. Phase 6 needs that, because it turns probabilities into costs.
-
-Next to it sits a **rule baseline**: six readable checks (/root, /etc and home-directory access, permission calls, shell tools, unexpected processes), each with a threshold at the 95th percentile of benign training packages. It's roughly what a security team would write by hand.
-
-**Results on the grouped test set** (2,141 packages the model never saw, with no family overlap; 95% bootstrap intervals in `reports/tables/test_metrics.csv`):
-
-| | PR-AUC | Malicious caught at 1% false alarms | at 5% false alarms |
-| --- | --- | --- | --- |
-| Gradient boosting (calibrated) | 0.999 (0.999-1.000) | 99.3% (98.2-99.7) | 99.9% |
-| Rule baseline | 0.740 (0.719-0.762) | 18.2% (15.7-20.5) | 45.4% |
-
-**How much of that is real?** The same model was retrained with different inputs (`reports/tables/ablation.csv`, `images/model_ablation.png`):
-
-| Inputs | Caught at 1% false alarms |
-| --- | --- |
-| All 49 features | 99.3% |
-| Random split instead of grouped | 99.8% |
-| Without network features | 98.5% |
-| Without dependency and missingness features | 97.8% |
-| Without any collection-sensitive group (24 behaviour features) | 95.6% |
-| Filesystem access only | 86.0% |
-| Syscall counts only | 75.0% |
-| Process lists only | 0.0% |
-
-Two things stand out. First, the grouped split costs less than expected (99.8% compared with 99.3%), so the package families weren't the main source of optimism. Second, behaviour alone still separates the classes well, but the full model *leans* on the artefact-prone features: 65% of its SHAP attribution comes from the dependency, network and missingness groups (`reports/tables/shap_group_share.csv`). The single biggest driver is "declared dependencies", which is empty for nearly every malicious row because they were installed from local files. Without those features, about six times as many malicious packages slip through at a 1% false-alarm rate (4.4% compared with 0.7%).
-
-**Decision taken:** the app and the decision policy use the all-features model, because it scores best on this data. The trade-off is that some of its explanations point at install-method artefacts rather than behaviour. Those drivers are flagged as collection-sensitive (`Driver.collection_sensitive`) so the app can say so. The behaviour-only result (95.6%) is the more conservative estimate of what you'd see in a sandbox where every package is installed the same way, and the report presents both.
-
-**Figures:** `images/model_pr_curve.png`, `model_reliability.png`, `model_score_distribution.png`, `model_ablation.png`, `model_shap_importance.png`.
-
-**Model card in brief**
-
-- *Intended use:* ranking sandboxed install traces for review by a security analyst. Not for labelling packages as malicious in public.
-- *Training data:* QUT-DV25, 9,988 packages (train), 2,141 (validation, calibration only), 2,141 (test, used once).
-- *Known limits:* collection artefacts (above); benign labels not independently verified; 50/50 class balance (Phase 6 re-weights to realistic rates); runtime-only malware is invisible to install traces; one sandbox, one ecosystem.
-- *Artefacts:* `artifacts/model.joblib` (not committed; rebuilt by the training script) with a readable `artifacts/model.json` alongside. The training script also saves `artifacts/model_behaviour.joblib`: the same settings trained on the 24 behaviour features only, used to price the conservative business case below.
-
-
-## From scores to decisions
-
-```powershell
-python scripts/run_business_simulation.py    # about 2 minutes
-```
-
-**The policy.** Each package gets one of three outcomes: *allow* if its probability is below `t_low`, *block* if it is at or above `t_high`, and *send to an analyst* if it falls in between. The two thresholds are chosen on the validation split by minimising expected cost, as long as the review tier fits the team's daily capacity. Expected cost here is review time, plus missed malicious packages times the expected breach cost, plus developer time lost to wrongly blocked packages. The outcomes below are then measured on the test split and scaled to a request stream with a realistic share of malicious packages. Base case thresholds: `t_low = 0.145`, `t_high = 0.291` (saved to `artifacts/policy.json` for the app).
-
-**Assumptions** live in `configs/business.yaml`. The breach cost is sourced (IBM 2025: USD 4.91M average for supply chain compromise). Everything else is a labelled assumption: 200 requests a day, 2 analysts doing 12 reviews each, 30 minutes per review, analysts catching 90% of what they review, and a 5% chance that an installed malicious package turns into a breach.
-
-**Base case: 1% of requests malicious, per 10,000 requests** (`reports/tables/business_scenarios.csv`):
-
-| Policy | Analysts needed | Malicious let through | Safe packages blocked | Expected cost |
-| --- | --- | --- | --- | --- |
+| Policy | Reviews a day | Attacks missed | Safe packages blocked | Expected cost |
+|---|---|---|---|---|
 | Allow everything | 0 | 100 | 0 | $24.6M |
-| Review everything | 16.7 | 10 | 0 | $2.76M |
-| Rule screen, flags go to review | 3.1 | 46 | 0 | $11.4M |
-| **Model triage** | **0.2** | **0.3** | **139** | **$98k** (95% CI $31k-$190k) |
+| Simple rules | 37 | 46 | 0 | $11.4M |
+| Review everything | 200 (~17 analysts) | 10 | 0 | $2.76M |
+| Model, behaviour only | 18 | 0.6 | 674 | $255k |
+| **Model triage** | **2.4** | **0.3** | **139** | **$98k** |
 
-The same pattern holds at 0.1% and 5% malicious (`images/business_cost_by_scenario.png`). With two analysts, only the model policy fits the team's capacity. Reviewing everything would need about 17 people, and the rule screen still sends 37 packages a day (`images/business_workload.png`).
+- **Two analysts are enough**: the model sends 2.4 packages a day to a person instead of 200.
+- **Saves about $2.66M** per 10,000 requests against reviewing everything (**$2.50M** with the behaviour-only model), so the business case does not depend on the install-method shortcut.
+- **One honest catch:** attacks are rare, so at 1% malicious only **42% of blocks are real attacks**. A block should work like airport security: a quarantine with a quick appeal, not a final verdict.
 
-**The base-rate effect** (`reports/tables/base_rate_effect.csv`). The test set is 50% malicious, real request streams are not. Keeping the base-case thresholds fixed and only changing the share of malicious requests:
+<p align="center"><img src="images/business_cost_by_scenario.png" width="760" alt="Expected cost per 10,000 requests at 0.1%, 1% and 5% malicious"></p>
 
-| Malicious share | Blocked packages that are malicious | False alarms per real attack |
-| --- | --- | --- |
-| 50% (test set) | 98.6% | 0.03 |
-| 5% | 78.9% | 0.5 |
-| 1% (base case) | 41.8% | 2.6 |
-| 0.1% | 6.6% | 26 |
+The ranking holds at every attack rate. The saving depends most on how likely a malicious install
+is to become a breach, and on how reliable human reviewers are:
 
-The model's error rates don't change; there are just far more safe packages for it to get wrong. At 1% malicious, more than half of all blocks hit safe packages, so a block should work as a quarantine with a quick appeal, not a final verdict. "False alarms" counts safe packages sent to review or blocked; "real attack" counts malicious packages sent to review or blocked. The policy simulator in the app shows both numbers for any setting.
+<p align="center"><img src="images/business_sensitivity.png" width="520" alt="One-way sensitivity of the saving against reviewing everything"></p>
 
-**The conservative case: behaviour-only model** (`reports/tables/business_model_variants.csv`). The same simulation, with thresholds re-chosen on validation, for the model trained without the network, dependency and missingness groups:
+All savings are **offline estimates** under labelled assumptions in
+[`configs/business.yaml`](configs/business.yaml); only the breach cost is a published figure.
 
-| Base case, per 10,000 requests | All features | Behaviour only |
-| --- | --- | --- |
-| Thresholds (allow below / block at or above) | 0.145 / 0.291 | 0.058 / 0.209 |
-| Reviews per day (capacity 24) | 2.4 | 18.3 |
-| Analysts needed | 0.2 | 1.5 |
-| Malicious let through | 0.3 | 0.6 |
-| Safe packages blocked | 139 | 674 |
-| Blocked packages that are malicious | 41.8% | 12.8% |
-| Expected cost | $98k | $255k |
-| Saving against review everything | $2.66M | $2.50M |
+---
 
-The less certain model doesn't let many more attacks through, because the cost-minimising thresholds move: it sends about eight times as many packages to analysts (still within the two-person capacity) and blocks about five times as many safe ones. The saving against reviewing everything barely moves. What the artefact really buys the full model is a quieter queue and fewer wrong blocks, not fewer missed attacks.
+## Dashboard preview
 
-**What drives the saving** (`images/business_sensitivity.png`, `reports/tables/sensitivity.csv`). Against a fully staffed review-everything process, the saving per 10,000 requests is $2.66M in the base case. It is most sensitive to:
+A small Streamlit app with three pages.
 
-- *breach probability per malicious install*: $0.76M saving at 1%, $24M at 50%
-- *analyst detection rate*: $7.5M saving if analysts catch only 70%, but **only $0.21M if they catch everything**. Much of the advantage over full manual review comes from assuming people miss some malicious packages. If your reviewers are excellent, the case rests mainly on workload rather than risk.
-- *breach cost*: $0.77M at $1M, $5.1M at $10M
+**Review queue:** a simulated day of requests from held-out packages, checked against the team's capacity
 
-Review time, hourly rates and developer friction barely matter, because one missed malicious package outweighs hundreds of hours of review.
+![Review queue](docs/images/app_review_queue.png)
 
-**Break-even** (`reports/tables/break_even.csv`): the model policy beats allowing everything once the chance of a breach per malicious install exceeds 0.004%. It is cheaper than reviewing everything and than the rule screen at any breach probability.
+**Package detail:** why one package scored the way it did. Hatched bars come from install-method features, which analysts should weight less
 
-**What these numbers are not.** They are offline estimates under the assumptions above, not savings measured in an organisation. They inherit the model's near-perfect test performance, which is partly helped by collection artefacts (see the robustness checks above). The behaviour-only business case above is the more conservative estimate for a sandbox where every package is installed the same way. The 139 wrongly blocked packages per 10,000 is the price of a cost function that weighs a missed attack very heavily. Teams that care more about developer friction can raise `t_high` and accept more review.
+![Package detail](docs/images/app_package_detail.png)
 
-## The app
+**Model evidence:** test results, calibration and known limits
+
+![Model evidence](docs/images/app_model_evidence.png)
+
+---
+
+## How to run
+
+Python 3.12. On Windows, `tasks.ps1` runs every step in order:
 
 ```powershell
-streamlit run app/streamlit_app.py
+.\tasks.ps1 setup    # virtual environment + pinned dependencies
+.\tasks.ps1 all      # download -> audit -> features -> train -> evaluate -> business results (~7 min)
+.\tasks.ps1 app      # dashboard at http://localhost:8501
+.\tasks.ps1 test     # 87 automated tests
 ```
 
-Run the training and simulation scripts first (`train_model.py`, then `run_business_simulation.py`): the app reads `artifacts/model.joblib` and `artifacts/policy.json`.
+Or step by step:
 
-| Page | Who it's for | What you can do |
-| --- | --- | --- |
-| Overview | Anyone | Base-case numbers at a glance and the caveats to keep in mind |
-| Review queue | Analyst | Simulate a day of requests from the held-out test packages (choose volume and share malicious) or upload a sandbox export; see what was allowed, sent for review or blocked against the team's capacity; download the decisions |
-| Package detail | Analyst | Open one package, see its top reasons as a chart and in words, with collection-sensitive reasons marked; work through a short checklist; record allow / block / escalate with a note; download the session's decision log |
-| Policy simulator | Manager | Change request volume, team size, review time, analyst detection rate, breach chance and cost; move the thresholds or let the app find the cheapest ones; compare all four ways of handling requests |
-| Model evidence | Manager, assessor | Test results, calibration, robustness checks, what drives the scores, known limitations |
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+pip install -e . --no-deps
 
-The UI does no modelling itself. Everything goes through `ScoringService` in `src/pkgtriage/services/scoring.py`, which validates an upload, builds features, scores, applies the thresholds and explains each package. Uploads with missing columns, text in count columns or duplicate names get a plain error message instead of a crash. `data/sample/sample_requests.csv` has 25 held-out packages, with the label removed, for trying the upload. Scoring takes about 6.5 ms per package.
-
-Thresholds changed in the simulator carry over to the review queue for the rest of the session. Decisions are kept for the session only. There's no database, on purpose: this is a demonstration of the workflow, not a production system.
-
-One thing the queue makes obvious: the model's probabilities sit very close to 0 or 1, so on simulated days almost nothing lands in the review tier. That is consistent with the near-perfect test results, and it's also a warning. A model trained without the collection artefacts would be less certain, and the review tier would carry more of the load.
-
-## Testing and validation
-
-```powershell
-pytest                                     # 87 tests, about 40 seconds
-python scripts/check_reproducibility.py    # rebuilds features, split and model and compares
-python scripts/error_analysis.py           # what the policy gets wrong on the test set
+python scripts/download_data.py            # QUT-DV25 from Hugging Face, checksum verified
+python scripts/run_data_audit.py           # validation, artefact audit, EDA figures
+python scripts/build_dataset.py            # 49 features + family-grouped 70/15/15 split
+python scripts/train_model.py              # tuning, training, calibration (~3 min)
+python scripts/evaluate_model.py           # test results, ablations, SHAP
+python scripts/run_business_simulation.py  # thresholds, costs, scenarios, sensitivity
+streamlit run app/streamlit_app.py         # dashboard
 ```
 
-**Tests** (`tests/`):
+`python scripts/check_reproducibility.py` rebuilds the data, split and model and checks they match
+the saved results (5 of 5 checks pass).
 
-| Folder | What's covered |
-| --- | --- |
-| `unit/` (61) | Parsers on normal, empty and malformed cells; name families; validation failures; grouped split never leaks a family; feature table has no name-derived columns and ignores sandbox processes; rule baseline; metrics; unit costs and allow-everything / review-everything costs worked out by hand; threshold search; upload checks; block precision and false alarms per real attack worked out by hand, and falling as attacks get rarer |
-| `integration/` (12) | The whole pipeline on 200 real rows (features, split, training, calibration, thresholds, policy comparison); training is deterministic; the real scoring service on traces with no activity, extreme counts and unknown process names; SHAP values add up exactly to the model's raw score; the saved behaviour-only model contains none of the collection-sensitive features |
-| `acceptance/` (14) | One test per requirement ID: FR1-FR9 and NFR1-NFR4, NFR7. NFR5 (tiers have text labels, not colour alone) and NFR6 (fresh Windows setup) were checked by hand |
+---
 
-The tests use `tests/fixtures/qutdv25_sample.csv` (200 rows from the training split). Tests that need the trained model are skipped, not failed, if `artifacts/` is empty.
-
-**A bug the tests caught.** When the threshold search thinned its candidate grid, it also dropped the round values (0.5, 0.9...) that tend to fall in the gap between the classes, so with the coarse grid the app uses it could miss a clean cut. After the fix, the saved thresholds moved slightly (base case 0.145 / 0.291 instead of 0.158 / 0.298). The base-case cost went from $97k to $98k per 10,000 requests, and the number of malicious packages let through didn't change.
-
-**Reproducibility** (`reports/tables/reproducibility.csv`): all five checks pass. The data matches its pinned checksum, features and the grouped split rebuild identically, two training runs give identical predictions, and retraining gives exactly the saved model.
-
-**Where it goes wrong** (`reports/tables/error_confusion.csv`, `error_cases.csv`). On the 2,141 grouped test packages, at the base-case thresholds:
-
-| | Benign | Malicious |
-| --- | --- | --- |
-| Allowed | 1,044 | **3** |
-| Sent to an analyst | 13 | 4 |
-| Blocked | **15** | 1,062 |
-
-For **all 18** mistakes, at least two of the top three reasons come from the collection-sensitive features. The 15 blocked safe packages mostly have no declared dependencies and little network traffic, so they look like they were installed from a local file, which is what the model learned malicious packages look like. The three malicious packages that got through look the other way round. The model's errors are exactly where the dataset's collection artefact predicts they would be, which is the strongest evidence in this project that a behaviour-only model is the safer choice for real use.
-
-## Layout so far
+## Project structure
 
 ```
-configs/            settings and business assumptions (YAML, every number sourced or labelled)
-logs/               script logs (not committed)
-tasks.ps1           runs the pipeline steps in order
-requirements.txt    exact versions used for the committed results
-data/               download instructions, split lists and a sample upload; raw and processed data stay out of Git
-images/             matplotlib figures for the report and the app
-notebooks/          exploratory analysis
-reports/tables/     CSV outputs that the report numbers come from
-scripts/            command-line entry points
-app/                Streamlit app (entry point, shared components, pages)
-tests/              unit, integration and acceptance tests, plus a 200-row fixture
-src/pkgtriage/      the Python package (config, data, features, models, business, services, plots)
-artifacts/          trained model files (not committed)
+app/              Streamlit dashboard (review queue, package detail, model evidence)
+configs/          dataset version, split, seed and every business assumption with its source
+data/             download instructions and split lists (raw data is not committed)
+images/           every figure, made with matplotlib
+reports/tables/   the CSV results every number above comes from
+scripts/          pipeline steps, run in order
+src/pkgtriage/    the Python package: data, features, models, business, services
+tests/            87 unit, integration and acceptance tests
 ```
+
+---
+
+## Limitations
+
+- One dataset and one sandbox; all savings are offline estimates, not measured in a company.
+- Malware that waits until it is imported is invisible to installation traces.
+- Benign labels were not independently checked.
+- The tool supports decisions; an analyst can override every block.
+
+---
 
 ## Credits
 
-The dataset and the original detection approach belong to Sk Tanzir Mehedi, Raja Jurdak, Chadni Islam and Gowri Ramachandran (QUT), released under the MIT licence:
+Dataset and base approach: Sk Tanzir Mehedi, Raja Jurdak, Chadni Islam and Gowri Ramachandran
+(Queensland University of Technology), MIT licence.
 
-- *QUT-DV25: A Dataset for Dynamic Analysis of Next-Gen Software Supply Chain Attacks*, NeurIPS 2025, arXiv:2505.13804
-- *DySec: A Machine Learning-based Dynamic Analysis for Detecting Malicious Packages in the PyPI Ecosystem*, arXiv:2503.00324
+- *DySec: A Machine Learning-based Dynamic Analysis for Detecting Malicious Packages in the PyPI Ecosystem*, [arXiv:2503.00324](https://arxiv.org/abs/2503.00324)
+- *QUT-DV25: A Dataset for Dynamic Analysis of Next-Gen Software Supply Chain Attacks*, NeurIPS 2025, [arXiv:2505.13804](https://arxiv.org/abs/2505.13804)
+- Data mirror: [Hugnd-UIT/ML-Based-Malicious-Package-Detection](https://huggingface.co/datasets/Hugnd-UIT/ML-Based-Malicious-Package-Detection) on Hugging Face
