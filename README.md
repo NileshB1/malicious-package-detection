@@ -160,10 +160,10 @@ A small Streamlit app with three pages.
 Python 3.12. On Windows, `tasks.ps1` runs every step in order:
 
 ```powershell
-.\tasks.ps1 setup    # virtual environment + pinned dependencies
-.\tasks.ps1 all      # download -> audit -> features -> train -> evaluate -> business results (~7 min)
-.\tasks.ps1 app      # dashboard at http://localhost:8501
-.\tasks.ps1 test     # 87 automated tests
+.\tasks.ps1 setup  # virtual environment + pinned dependencies
+.\tasks.ps1 all     # download -> audit -> features -> train -> evaluate -> business results (~7 min)
+.\tasks.ps1 app  # dashboard at http://localhost:8501
+.\tasks.ps1 test   # 87 automated tests
 ```
 
 Or step by step:
@@ -174,13 +174,13 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e . --no-deps
 
-python scripts/download_data.py            # QUT-DV25 from Hugging Face, checksum verified
-python scripts/run_data_audit.py           # validation, artefact audit, EDA figures
-python scripts/build_dataset.py            # 49 features + family-grouped 70/15/15 split
-python scripts/train_model.py              # tuning, training, calibration (~3 min)
-python scripts/evaluate_model.py           # test results, ablations, SHAP
+python scripts/download_data.py  # QUT-DV25 from Hugging Face, checksum verified
+python scripts/run_data_audit.py  # validation, artefact audit, EDA figures
+python scripts/build_dataset.py # 49 features + family-grouped 70/15/15 split
+python scripts/train_model.py     # tuning, training, calibration (~3 min)
+python scripts/evaluate_model.py     # test results, ablations, SHAP
 python scripts/run_business_simulation.py  # thresholds, costs, scenarios, sensitivity
-streamlit run app/streamlit_app.py         # dashboard
+streamlit run app/streamlit_app.py  # dashboard
 ```
 
 `python scripts/check_reproducibility.py` rebuilds the data, split and model and checks they match
@@ -191,14 +191,14 @@ the saved results (5 of 5 checks pass).
 ## Project structure
 
 ```
-app/              Streamlit dashboard (review queue, package detail, model evidence)
-configs/          dataset version, split, seed and every business assumption with its source
-data/             download instructions and split lists (raw data is not committed)
-images/           every figure, made with matplotlib
+app/       Streamlit dashboard (review queue, package detail, model evidence)
+configs/      dataset version, split, seed and every business assumption with its source
+data/    download instructions and split lists (raw data is not committed)
+images/    every figure, made with matplotlib
 reports/tables/   the CSV results every number above comes from
-scripts/          pipeline steps, run in order
+scripts/    pipeline steps, run in order
 src/pkgtriage/    the Python package: data, features, models, business, services
-tests/            87 unit, integration and acceptance tests
+tests/    87 unit, integration and acceptance tests
 ```
 
 ---
